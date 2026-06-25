@@ -30,10 +30,13 @@
         </header>
 
         <!-- 頁籤導覽列 -->
+        {% if enable_review %}
         <div class="tabs-container">
             <button class="tab-btn active" onclick="switchTab('units-tab')">📖 學習單元</button>
             <button class="tab-btn" onclick="switchTab('progress-tab')">📅 複習進度表</button>
         </div>
+        {% endif %}
+
 
         <!-- 學習單元分頁 -->
         <div id="units-tab" class="tab-content active-content">
@@ -76,6 +79,7 @@
         </div>
 
         <!-- 暑期複習進度分頁 -->
+        {% if enable_review %}
         <div id="progress-tab" class="tab-content">
             <section class="card" style="padding: 24px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
@@ -126,6 +130,7 @@
                 </div>
             </section>
         </div>
+        {% endif %}
     </div>
 
     <script>

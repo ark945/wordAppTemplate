@@ -207,6 +207,14 @@ class DatabaseManager:
             print(f"Supabase Set Config Error: {e}")
             return False
 
+    def clear_quiz_results(self):
+        try:
+            supabase.table("quiz_results").delete().neq("id", -1).execute()
+            return True
+        except Exception as e:
+            print(f"Supabase Clear Quiz Results Error: {e}")
+            return False
+
 db = DatabaseManager()
 
 # ==========================================
@@ -321,6 +329,13 @@ def api_admin_password():
     })
     return jsonify({"success": True})
 
+@app.route('/api/admin/clear_quiz_results', methods=['POST'])
+@login_required
+def api_clear_quiz_results():
+    if db.clear_quiz_results():
+        return jsonify({"success": True, "message": "已成功清除所有複習進度紀錄"})
+    return jsonify({"success": False, "message": "清除失敗"})
+
 # ==========================================
 # 2. Config & Helpers
 # ==========================================
@@ -345,7 +360,9 @@ def get_local_ip():
 @app.route('/')
 def index():
     units = db.get_units()
-    return render_template('index.html', units=units)
+    r_settings = db.get_config("review_settings") or {}
+    enable_review = r_settings.get("enable_review", True)
+    return render_template('index.html', units=units, enable_review=enable_review)
 
 @app.route('/list/<unit>')
 def word_list(unit):

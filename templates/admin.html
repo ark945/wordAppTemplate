@@ -172,6 +172,13 @@
             <!-- 1. 複習表設定 -->
             <div class="form-section">
                 <h3>📅 複習進度表設定</h3>
+                <div class="switch-container">
+                    <label class="switch">
+                        <input type="checkbox" id="reviewEnable">
+                        <span class="slider"></span>
+                    </label>
+                    <span style="font-weight: 600; font-size: 1rem;">啟用複習進度表功能 (關閉時不顯示首頁頁簽)</span>
+                </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label for="startDate">複習開始日期</label>
@@ -241,6 +248,17 @@
                 <button onclick="updatePassword()" class="btn btn-secondary" style="align-self: flex-start; margin-top: 5px;">🔑 變更密碼</button>
             </div>
 
+            <!-- 4. 危險區域 -->
+            <div class="form-section" style="border-bottom: none; margin-top: 20px;">
+                <h3 style="color: var(--error);">⚠️ 危險區域</h3>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: -5px; margin-bottom: 15px;">
+                    注意：此操作將永久清除資料庫中的所有學生複習進度紀錄 (quiz_results 表格中的資料)，此動作無法復原。
+                </p>
+                <button id="clearQuizBtn" onclick="confirmClearQuiz()" class="btn btn-secondary" style="border-color: var(--error); color: var(--error); font-weight: 600; background-color: transparent; transition: all 0.3s ease;">
+                    🗑️ 清除所有複習進度紀錄
+                </button>
+            </div>
+
             <div style="display: flex; justify-content: flex-end; margin-top: 30px; border-top: 2px solid var(--border-color); padding-top: 20px;">
                 <button onclick="saveAllSettings()" class="btn btn-primary" style="padding: 12px 30px; font-size: 1rem;">💾 儲存所有設定</button>
             </div>
@@ -283,6 +301,7 @@
                 document.getElementById('startDate').value = rSettings.start_date || '2026-07-01';
                 document.getElementById('endDate').value = rSettings.end_date || '2026-08-31';
                 document.getElementById('requiredDays').value = rSettings.required_days || 2;
+                document.getElementById('reviewEnable').checked = rSettings.enable_review !== false;
 
                 // 填入單元選單
                 const selectedUnits = rSettings.selected_units || [];
@@ -325,7 +344,8 @@
                 start_date: document.getElementById('startDate').value,
                 end_date: document.getElementById('endDate').value,
                 required_days: parseInt(document.getElementById('requiredDays').value) || 2,
-                selected_units: checkedUnits
+                selected_units: checkedUnits,
+                enable_review: document.getElementById('reviewEnable').checked
             };
 
             const receiversRaw = document.getElementById('receivers').value;
@@ -392,6 +412,71 @@
             } catch (e) {
                 console.error(e);
                 showToast('變更密碼發生錯誤', 'error');
+            }
+        }
+
+        let clearConfirmCount = 0;
+        let clearTimer = null;
+
+        function confirmClearQuiz() {
+            const btn = document.getElementById('clearQuizBtn');
+            clearConfirmCount++;
+
+            if (clearTimer) clearTimeout(clearTimer);
+            clearTimer = setTimeout(() => {
+                clearConfirmCount = 0;
+                btn.className = 'btn btn-secondary';
+                btn.style.borderColor = 'var(--error)';
+                btn.style.color = 'var(--error)';
+                btn.style.backgroundColor = 'transparent';
+                btn.innerText = '🗑️ 清除所有複習進度紀錄';
+            }, 5000);
+
+            if (clearConfirmCount === 1) {
+                btn.innerText = '⚠️ 請再次點擊確認清除 (第 2/3 次確認)';
+                btn.style.backgroundColor = '#f97316';
+                btn.style.color = 'white';
+                btn.style.borderColor = '#f97316';
+            } else if (clearConfirmCount === 2) {
+                btn.innerText = '🔥 最後一次確認！點擊即永久刪除！(第 3/3 次確認)';
+                btn.style.backgroundColor = '#ef4444';
+                btn.style.color = 'white';
+                btn.style.borderColor = '#ef4444';
+            } else if (clearConfirmCount === 3) {
+                clearConfirmCount = 0;
+                if (clearTimer) clearTimeout(clearTimer);
+                clearTimer = null;
+                btn.disabled = true;
+                btn.innerText = '⏳ 正在清除...';
+                
+                fetch('/api/admin/clear_quiz_results', {
+                    method: 'POST'
+                })
+                .then(res => res.json())
+                .then(data => {
+                    btn.disabled = false;
+                    btn.className = 'btn btn-secondary';
+                    btn.style.borderColor = 'var(--error)';
+                    btn.style.color = 'var(--error)';
+                    btn.style.backgroundColor = 'transparent';
+                    btn.innerText = '🗑️ 清除所有複習進度紀錄';
+                    
+                    if (data.success) {
+                        showToast(data.message || '已成功清除所有複習進度紀錄！');
+                    } else {
+                        showToast(data.message || '清除失敗', 'error');
+                    }
+                })
+                .catch(err => {
+                    btn.disabled = false;
+                    btn.className = 'btn btn-secondary';
+                    btn.style.borderColor = 'var(--error)';
+                    btn.style.color = 'var(--error)';
+                    btn.style.backgroundColor = 'transparent';
+                    btn.innerText = '🗑️ 清除所有複習進度紀錄';
+                    console.error(err);
+                    showToast('伺服器連線失敗', 'error');
+                });
             }
         }
 
