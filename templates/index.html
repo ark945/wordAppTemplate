@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>英文單字小學堂 Web</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <div class="container">
+        <header class="card">
+            <div>
+                <h1>📚 單字小學堂</h1>
+                <p style="color: var(--text-muted); margin-top: 5px;">您的專屬雲端學習助手</p>
+            </div>
+
+            <div class="controls">
+                <div class="user-select-wrapper">
+                    <span style="font-size: 1.2rem; margin-right: 5px;">👤</span>
+                    <select id="currentUser" onchange="updateLinks()">
+                        <option value="訪客">訪客</option>
+                    </select>
+                </div>
+                <a href="{{ url_for('import_page') }}" class="btn btn-primary">匯入單字</a>
+                <a href="{{ url_for('manage_users_page') }}" class="btn btn-secondary">⚙️ 設定</a>
+                <a href="{{ url_for('admin_panel') }}" class="btn btn-secondary">🔐 後台管理</a>
+            </div>
+        </header>
+
+        <!-- 頁籤導覽列 -->
+        <div class="tabs-container">
+            <button class="tab-btn active" onclick="switchTab('units-tab')">📖 學習單元</button>
+            <button class="tab-btn" onclick="switchTab('progress-tab')">📅 複習進度表</button>
+        </div>
+
+        <!-- 學習單元分頁 -->
+        <div id="units-tab" class="tab-content active-content">
+            <section class="card">
+                <h2 style="display: flex; justify-content: space-between; align-items: center;">
+                    📖 學習單元
+                    <span style="font-size: 0.9rem; font-weight: normal; color: var(--text-muted);">
+                        共 {{ units|length }} 個單元
+                    </span>
+                </h2>
+
+                <div id="unit-list">
+                    {% if units %}
+                    {% for unit in units %}
+                    <div class="unit-item" style="flex-direction: column; align-items: start; gap: 15px;">
+                        <div class="unit-name"
+                            style="border-bottom: 1px solid var(--border-color); width: 100%; padding-bottom: 10px; margin-bottom: 5px;">
+                            {{ unit }}</div>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <a href="#" onclick="goStudy('{{ unit }}')" class="btn btn-secondary">📖 單字卡</a>
+                            <a href="#" onclick="goQuiz('{{ unit }}', 'quiz')" class="btn btn-primary"
+                                style="background-color: #6366f1;">選中文</a>
+                            <a href="#" onclick="goQuiz('{{ unit }}', 'reverse')" class="btn btn-primary"
+                                style="background-color: #8b5cf6;">選英文</a>
+                            <a href="#" onclick="goQuiz('{{ unit }}', 'spelling')" class="btn btn-primary"
+                                style="background-color: #ec4899;">拼字</a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                        <p style="font-size: 4rem; margin: 0;">📭</p>
+                        <p>目前還沒有單字資料庫</p>
+                        <a href="{{ url_for('import_page') }}" class="btn btn-primary" style="margin-top: 10px;">立即匯入
+                            PDF</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </section>
+        </div>
+
+        <!-- 暑期複習進度分頁 -->
+        <div id="progress-tab" class="tab-content">
+            <section class="card" style="padding: 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+                    <h2 style="margin: 0; border: none; padding: 0;" id="review-table-title">📅 複習進度表</h2>
+                    <div class="controls" style="margin: 0;">
+                        <span style="font-weight: 600; color: var(--text-muted); font-size: 0.95rem;">學生篩選：</span>
+                        <div class="user-select-wrapper" style="padding: 2px 10px;">
+                            <span style="font-size: 1.1rem; margin-right: 5px;">👤</span>
+                            <select id="progressUserFilter" onchange="renderMatrixProgress()">
+                                <option value="">👤 載入中...</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="progress-legend" style="margin-bottom: 20px;">
+                    <div class="legend-item"><span class="legend-box badge-quiz" style="border-radius: 4px; border: none; width: 14px; height: 14px;"></span>選中文</div>
+                    <div class="legend-item"><span class="legend-box badge-reverse" style="border-radius: 4px; border: none; width: 14px; height: 14px;"></span>選英文</div>
+                    <div class="legend-item"><span class="legend-box badge-spelling" style="border-radius: 4px; border: none; width: 14px; height: 14px;"></span>拼字</div>
+                    <div class="legend-item" style="margin-left: auto; font-size: 0.9rem;">
+                        <span style="color: var(--primary-color); font-weight: bold;">⭐ 達標標準：正確率 >= 90%</span>
+                    </div>
+                </div>
+
+                <!-- 大表格矩陣滾動容器 -->
+                <div class="table-responsive matrix-scroll-container">
+                    <table class="progress-table matrix-table">
+                        <thead>
+                            <tr id="matrix-header-row">
+                                <th class="sticky-col-header">日期 \ 單元</th>
+                                <!-- JS 動態插入單元名稱 -->
+                            </tr>
+                        </thead>
+                        <tbody id="matrix-table-body">
+                            <tr>
+                                <td colspan="100%" style="text-align: center; padding: 60px; color: var(--text-muted);">
+                                    ⏳ 正在載入進度數據並生成複習表，請稍候...
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr id="matrix-footer-row" class="matrix-summary-row">
+                                <td class="sticky-col-header" style="font-weight: 700; background-color: #f1f5f9;">Summary</td>
+                                <!-- JS 動態插入各單元 Summary 統計 -->
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        // Load users on startup
+        async function loadUsers() {
+            try {
+                const res = await fetch('/api/users');
+                const users = await res.json();
+                const select = document.getElementById('currentUser');
+
+                users.forEach(u => {
+                    const opt = document.createElement('option');
+                    opt.value = u.name;
+                    opt.innerText = u.name;
+                    select.appendChild(opt);
+                });
+
+                // Restore previous selection if exists
+                const lastUser = localStorage.getItem('lastUser');
+                if (lastUser) {
+                    // Check if user still exists
+                    if (users.some(u => u.name === lastUser) || lastUser === "訪客") {
+                        select.value = lastUser;
+                    }
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function updateLinks() {
+            const user = document.getElementById('currentUser').value;
+            localStorage.setItem('lastUser', user);
+        }
+
+        function goStudy(unit) {
+            const user = document.getElementById('currentUser').value;
+            window.location.href = `/study/${unit}?user=${encodeURIComponent(user)}`;
+        }
+
+        function goQuiz(unit, mode) {
+            const user = document.getElementById('currentUser').value;
+            window.location.href = `/quiz/${mode}/${unit}?user=${encodeURIComponent(user)}`;
+        }
+
+        // Tab 切換與進度表資料拉取邏輯
+        function switchTab(tabId) {
+            const btns = document.querySelectorAll('.tab-btn');
+            btns.forEach(btn => {
+                if (btn.getAttribute('onclick').includes(tabId)) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+
+            const contents = document.querySelectorAll('.tab-content');
+            contents.forEach(content => {
+                if (content.id === tabId) {
+                    content.classList.add('active-content');
+                } else {
+                    content.classList.remove('active-content');
+                }
+            });
+
+            if (tabId === 'progress-tab') {
+                loadProgressData();
+            }
+        }
+
+        let progressRawData = null;
+
+        async function loadProgressData() {
+            const body = document.getElementById('matrix-table-body');
+            try {
+                body.innerHTML = `
+                    <tr>
+                        <td colspan="100%" style="text-align: center; padding: 60px; color: var(--text-muted);">
+                            ⏳ 正在從 Supabase 讀取最新進度資料，請稍候...
+                        </td>
+                    </tr>
+                `;
+
+                const res = await fetch('/api/review_progress');
+                const data = await res.json();
+
+                if (!data.success) {
+                    throw new Error(data.message || '無法取得複習進度');
+                }
+
+                progressRawData = data;
+
+                // 填入學生篩選下拉式選單 (僅包含單一學生，無 all)
+                const filterSelect = document.getElementById('progressUserFilter');
+                filterSelect.innerHTML = '';
+                if (data.users.length === 0) {
+                    filterSelect.innerHTML = '<option value="">無學生</option>';
+                } else {
+                    data.users.forEach(user => {
+                        const opt = document.createElement('option');
+                        opt.value = user;
+                        opt.innerText = `👤 ${user}`;
+                        filterSelect.appendChild(opt);
+                    });
+                }
+
+                // 預設篩選切換為目前登入的使用者
+                const currentUser = document.getElementById('currentUser').value;
+                if (currentUser && currentUser !== "訪客" && data.users.includes(currentUser)) {
+                    filterSelect.value = currentUser;
+                } else if (data.users.length > 0) {
+                    filterSelect.value = data.users[0];
+                }
+
+                renderMatrixProgress();
+
+            } catch (e) {
+                console.error(e);
+                body.innerHTML = `
+                    <tr>
+                        <td colspan="100%" style="text-align: center; padding: 40px; color: var(--error);">
+                            ❌ 載入失敗: ${e.message}。請確認 Supabase 中 \`quiz_results\` 表格是否已成功建立。
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        // 產生日期清單 (包含星期幾)
+        function generateDateRange(startStr, endStr) {
+            if (!startStr || !endStr) return [];
+            const dates = [];
+            const [sY, sM, sD] = startStr.split('-').map(Number);
+            const [eY, eM, eD] = endStr.split('-').map(Number);
+
+            const start = new Date(sY, sM - 1, sD);
+            const end = new Date(eY, eM - 1, eD);
+            const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+
+            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                const ymd = `${d.getFullYear()}-${month}-${day}`;
+                const wDay = weekDays[d.getDay()];
+                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                dates.push({
+                    ymd: ymd,
+                    label: `${month}-${day} (${wDay})`,
+                    isWeekend: isWeekend
+                });
+            }
+            return dates;
+        }
+
+        function renderMatrixProgress() {
+            if (!progressRawData) return;
+
+            const selectedUser = document.getElementById('progressUserFilter').value;
+            const { records, units, users, required_days, start_date, end_date } = progressRawData;
+
+            // 動態更新標題區間
+            const formatMDate = (dStr) => {
+                if (!dStr) return '';
+                const parts = dStr.split('-');
+                if (parts.length >= 3) return `${parseInt(parts[1])}/${parseInt(parts[2])}`;
+                return dStr;
+            };
+            document.getElementById('review-table-title').innerText = `📅 複習進度表 (${formatMDate(start_date)} - ${formatMDate(end_date)})`;
+
+            const headerRow = document.getElementById('matrix-header-row');
+            const tbody = document.getElementById('matrix-table-body');
+            const footerRow = document.getElementById('matrix-footer-row');
+
+            // 1. 繪製表頭 (橫列是單元數)
+            headerRow.innerHTML = '<th class="sticky-col-header" style="z-index: 20;">日期 \\ 單元</th>';
+            if (units.length === 0) {
+                headerRow.innerHTML += '<th>無單元資料</th>';
+                tbody.innerHTML = `<tr><td colspan="2" style="text-align: center; padding: 40px; color: var(--text-muted);">目前系統中沒有符合條件的複習單元。</td></tr>`;
+                footerRow.innerHTML = '<td class="sticky-col-header" style="font-weight: 700; background-color: #f1f5f9;">Summary</td><td>-</td>';
+                return;
+            }
+
+            if (!selectedUser || selectedUser === "") {
+                tbody.innerHTML = `<tr><td colspan="${units.length + 1}" style="text-align: center; padding: 40px; color: var(--text-muted);">請先在系統中新增學生。</td></tr>`;
+                footerRow.innerHTML = '<td class="sticky-col-header" style="font-weight: 700; background-color: #f1f5f9;">Summary</td>' + '<td>-</td>'.repeat(units.length);
+                return;
+            }
+
+            units.forEach(unit => {
+                const th = document.createElement('th');
+                th.innerText = unit;
+                headerRow.appendChild(th);
+            });
+
+            // 2. 初始化統計變數
+            const completedDaysMap = {};
+            const daysMap = {};
+            units.forEach(unit => {
+                completedDaysMap[unit] = 0;
+                daysMap[unit] = {};
+            });
+
+            // 建立 records 快取並過濾該學生合格記錄
+            const recordsMap = {};
+            records.forEach(r => {
+                if (r.user_name !== selectedUser) {
+                    return;
+                }
+
+                const uUnit = r.unit;
+                const uDate = r.date;
+                const uMode = r.mode;
+
+                if (daysMap[uUnit]) {
+                    if (!daysMap[uUnit][uDate]) {
+                        daysMap[uUnit][uDate] = { quiz: false, reverse: false, spelling: false };
+                    }
+                    daysMap[uUnit][uDate][uMode] = true;
+                }
+
+                if (!recordsMap[r.date]) recordsMap[r.date] = {};
+                if (!recordsMap[r.date][r.unit]) recordsMap[r.date][r.unit] = [];
+                recordsMap[r.date][r.unit].push(r);
+            });
+
+            // 計算該學生在每個單元完成複習的天數
+            units.forEach(unit => {
+                let completedDays = 0;
+                for (const dKey in daysMap[unit]) {
+                    const day = daysMap[unit][dKey];
+                    if (day.quiz && day.reverse && day.spelling) {
+                        completedDays++;
+                    }
+                }
+                completedDaysMap[unit] = completedDays;
+            });
+
+            // 3. 生成日期行
+            const dateRange = generateDateRange(start_date, end_date);
+            tbody.innerHTML = '';
+
+            if (dateRange.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${units.length + 1}" style="text-align: center; padding: 40px; color: var(--text-muted);">設定的日期區間無效。</td></tr>`;
+            } else {
+                dateRange.forEach(d => {
+                    const tr = document.createElement('tr');
+                    if (d.isWeekend) {
+                        tr.className = 'weekend-row';
+                    }
+
+                    // 日期列
+                    const tdDate = document.createElement('td');
+                    tdDate.className = 'sticky-col-header date-col';
+                    tdDate.innerText = d.label;
+                    tr.appendChild(tdDate);
+
+                    // 各單元格
+                    units.forEach(unit => {
+                        const tdUnit = document.createElement('td');
+                        tdUnit.className = 'matrix-cell';
+                        
+                        const dayRecords = (recordsMap[d.ymd] && recordsMap[d.ymd][unit]) ? recordsMap[d.ymd][unit] : [];
+                        
+                        if (dayRecords.length > 0) {
+                            dayRecords.forEach(r => {
+                                const modeMap = { "quiz": "中", "reverse": "英", "spelling": "拼" };
+                                const modeText = modeMap[r.mode] || r.mode;
+                                const badgeClass = `badge-${r.mode}`;
+                                
+                                const badge = document.createElement('div');
+                                badge.className = `progress-badge ${badgeClass}`;
+                                badge.innerText = modeText;
+                                badge.title = `${r.unit} (${r.mode}) - 正確率 ${r.accuracy}%`;
+                                badge.style.textAlign = 'center';
+                                tdUnit.appendChild(badge);
+                            });
+                        }
+                        tr.appendChild(tdUnit);
+                    });
+
+                    tbody.appendChild(tr);
+                });
+            }
+
+            // 4. 繪製最底下的 Summary 橫列
+            footerRow.innerHTML = '<td class="sticky-col-header" style="font-weight: 700; background-color: #f1f5f9; position: sticky; left:0; z-index: 10;">Summary</td>';
+            
+            units.forEach(unit => {
+                const tdSummary = document.createElement('td');
+                const daysCount = completedDaysMap[unit] || 0;
+                const displayDays = Math.min(daysCount, required_days);
+                const isCompleted = daysCount >= required_days;
+                
+                tdSummary.className = 'matrix-footer-cell';
+                
+                let statusBadge = '';
+                if (isCompleted) {
+                    statusBadge = '<span class="unit-status-pill completed" style="padding: 2px 6px; font-size: 0.7rem; margin-top: 4px; display: inline-block;">🎉 達標</span>';
+                    tdSummary.style.backgroundColor = 'rgba(34, 197, 94, 0.08)';
+                } else if (daysCount > 0) {
+                    statusBadge = '<span class="unit-status-pill in-progress" style="padding: 2px 6px; font-size: 0.7rem; margin-top: 4px; display: inline-block;">⏳ 進行中</span>';
+                } else {
+                    statusBadge = '<span class="unit-status-pill not-started" style="padding: 2px 6px; font-size: 0.7rem; margin-top: 4px; display: inline-block;">未開始</span>';
+                }
+
+                tdSummary.innerHTML = `
+                    <div style="font-size: 0.85rem; font-weight: bold; color: ${isCompleted ? 'var(--success)' : 'var(--text-main)'};">${displayDays} / ${required_days} 天</div>
+                    ${statusBadge}
+                `;
+                footerRow.appendChild(tdSummary);
+            });
+        }
+
+        loadUsers();
+    </script>
+</body>
+
+</html>

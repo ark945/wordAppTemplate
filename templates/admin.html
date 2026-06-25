@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系統後台管理 - 英文單字小學堂</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+        }
+        .form-section {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .form-section:last-child {
+            border-bottom: none;
+        }
+        .form-section h3 {
+            margin-top: 0;
+            color: var(--primary-color);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .form-group label {
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        .form-control {
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .form-control:focus {
+            border-color: var(--primary-color);
+        }
+        .unit-checkbox-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--bg-color);
+        }
+        .unit-checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            user-select: none;
+        }
+        .checkbox-input {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+        .switch-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 26px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #cbd5e1;
+            transition: .3s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: var(--primary-color);
+        }
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+        .msg-toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 9999;
+            transform: translateY(-20px);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+        .msg-toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        .msg-toast.success { background-color: var(--success); }
+        .msg-toast.error { background-color: var(--error); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Toast Notification -->
+        <div id="toast" class="msg-toast"></div>
+
+        <header class="card">
+            <div>
+                <h1>⚙️ 系統後台管理</h1>
+                <p style="color: var(--text-muted); margin-top: 5px;">配置單字系統、複習進度表與發信設定</p>
+            </div>
+            <div class="controls">
+                <a href="/" class="btn btn-secondary">🏠 首頁</a>
+                <a href="{{ url_for('admin_logout') }}" class="btn btn-secondary" style="border-color: var(--error); color: var(--error);">登出</a>
+            </div>
+        </header>
+
+        <div class="card" style="padding: 32px;">
+            <div class="admin-header">
+                <h2 style="margin: 0; border: none; padding: 0;">🔧 系統參數設定</h2>
+                <button onclick="saveAllSettings()" class="btn btn-primary">💾 儲存所有設定</button>
+            </div>
+
+            <!-- 1. 複習表設定 -->
+            <div class="form-section">
+                <h3>📅 複習進度表設定</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="startDate">複習開始日期</label>
+                        <input type="date" id="startDate" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="endDate">複習結束日期</label>
+                        <input type="date" id="endDate" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="requiredDays">規定複習次數 (天數)</label>
+                        <input type="number" id="requiredDays" class="form-control" min="1" max="60" value="2" required>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <label style="margin: 0;">要納入複習的單元</label>
+                        <div style="display: flex; gap: 8px;">
+                            <button type="button" onclick="selectAllUnits(true)" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem; border-radius: 6px;">全選</button>
+                            <button type="button" onclick="selectAllUnits(false)" class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem; border-radius: 6px;">全不選</button>
+                        </div>
+                    </div>
+                    <div class="unit-checkbox-container" id="unitCheckboxes">
+                        <!-- JS 動態插入單元 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Email 設定 -->
+            <div class="form-section">
+                <h3>✉️ 郵件通知設定</h3>
+                <div class="switch-container">
+                    <label class="switch">
+                        <input type="checkbox" id="emailEnable">
+                        <span class="slider"></span>
+                    </label>
+                    <span style="font-weight: 600; font-size: 1rem;">啟用測驗完成 Email 通知</span>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="senderEmail">寄件者信箱 (Sender Email)</label>
+                        <input type="email" id="senderEmail" class="form-control" placeholder="example@gmail.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="appPassword">郵件授權密碼 (App Password)</label>
+                        <input type="password" id="appPassword" class="form-control" placeholder="若使用環境變數設定則留空">
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top: 10px;">
+                    <label for="receivers">收件者信箱 (多個請用逗號隔開)</label>
+                    <input type="text" id="receivers" class="form-control" placeholder="parent1@example.com, parent2@example.com">
+                </div>
+            </div>
+
+            <!-- 3. 密碼修改設定 -->
+            <div class="form-section">
+                <h3>🔐 修改管理員密碼</h3>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: -5px; margin-bottom: 15px;">
+                    注意：若您有設定環境變數 `ADMIN_PASSWORD`，系統密碼將被強制寫死在環境變數中，後台密碼修改將不生效。
+                </p>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="oldPassword">舊密碼</label>
+                        <input type="password" id="oldPassword" class="form-control" placeholder="請輸入原密碼">
+                    </div>
+                    <div class="form-group">
+                        <label for="newPassword">新密碼</label>
+                        <input type="password" id="newPassword" class="form-control" placeholder="請輸入新密碼">
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmPassword">確認新密碼</label>
+                        <input type="password" id="confirmPassword" class="form-control" placeholder="請再次輸入新密碼">
+                    </div>
+                </div>
+                <button onclick="updatePassword()" class="btn btn-secondary" style="align-self: flex-start; margin-top: 5px;">🔑 變更密碼</button>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; margin-top: 30px; border-top: 2px solid var(--border-color); padding-top: 20px;">
+                <button onclick="saveAllSettings()" class="btn btn-primary" style="padding: 12px 30px; font-size: 1rem;">💾 儲存所有設定</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let availableUnits = [];
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.innerText = message;
+            toast.className = `msg-toast ${type} show`;
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        function selectAllUnits(status) {
+            document.querySelectorAll('.unit-check').forEach(cb => {
+                cb.checked = status;
+            });
+        }
+
+        async function loadSettings() {
+            try {
+                const res = await fetch('/api/admin/config');
+                const data = await res.json();
+
+                if (!data.success) {
+                    showToast(data.message || '讀取設定失敗', 'error');
+                    return;
+                }
+
+                const config = data.config;
+                availableUnits = data.available_units || [];
+
+                // 填入複習設定
+                const rSettings = config.review_settings || {};
+                document.getElementById('startDate').value = rSettings.start_date || '2026-07-01';
+                document.getElementById('endDate').value = rSettings.end_date || '2026-08-31';
+                document.getElementById('requiredDays').value = rSettings.required_days || 2;
+
+                // 填入單元選單
+                const selectedUnits = rSettings.selected_units || [];
+                const container = document.getElementById('unitCheckboxes');
+                container.innerHTML = '';
+                if (availableUnits.length === 0) {
+                    container.innerHTML = '<span style="color: var(--text-muted);">系統中尚無單元單字</span>';
+                } else {
+                    availableUnits.forEach(unit => {
+                        const isChecked = selectedUnits.includes(unit);
+                        const label = document.createElement('label');
+                        label.className = 'unit-checkbox-label';
+                        label.innerHTML = `
+                            <input type="checkbox" class="checkbox-input unit-check" value="${unit}" ${isChecked ? 'checked' : ''}>
+                            <span>${unit}</span>
+                        `;
+                        container.appendChild(label);
+                    });
+                }
+
+                // 填入 Email 設定
+                const eSettings = config.email_settings || {};
+                document.getElementById('emailEnable').checked = eSettings.enable || false;
+                document.getElementById('senderEmail').value = eSettings.sender_email || '';
+                document.getElementById('receivers').value = (eSettings.receivers || []).join(', ');
+                document.getElementById('appPassword').value = ''; // 密碼欄位只供寫入，讀取時維持空白
+
+            } catch (e) {
+                console.error(e);
+                showToast('伺服器連接錯誤，請稍後再試', 'error');
+            }
+        }
+
+        async function saveAllSettings() {
+            // 收集單元勾選結果
+            const checkedUnits = [];
+            document.querySelectorAll('.unit-check:checked').forEach(cb => {
+                checkedUnits.push(cb.value);
+            });
+
+            const review_settings = {
+                start_date: document.getElementById('startDate').value,
+                end_date: document.getElementById('endDate').value,
+                required_days: parseInt(document.getElementById('requiredDays').value) || 2,
+                selected_units: checkedUnits
+            };
+
+            const receiversRaw = document.getElementById('receivers').value;
+            const receivers = receiversRaw.split(',')
+                .map(r => r.trim())
+                .filter(r => r !== '');
+
+            const email_settings = {
+                enable: document.getElementById('emailEnable').checked,
+                sender_email: document.getElementById('senderEmail').value.trim(),
+                receivers: receivers
+            };
+
+            const appPwd = document.getElementById('appPassword').value.trim();
+            if (appPwd) {
+                email_settings.app_password = appPwd;
+            }
+
+            try {
+                const res = await fetch('/api/admin/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ review_settings, email_settings })
+                });
+                const result = await res.json();
+
+                if (result.success) {
+                    showToast('設定已成功儲存至 Supabase 雲端！');
+                    loadSettings(); // 重新載入以維持一致性
+                } else {
+                    showToast(result.message || '儲存失敗', 'error');
+                }
+            } catch (e) {
+                console.error(e);
+                showToast('儲存失敗，請檢查網路連線', 'error');
+            }
+        }
+
+        async function updatePassword() {
+            const oldPassword = document.getElementById('oldPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (!oldPassword || !newPassword) {
+                showToast('請填寫完整密碼欄位', 'error');
+                return;
+            }
+
+            if (newPassword !== confirmPassword) {
+                showToast('新密碼與確認新密碼不符', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/admin/password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ old_password: oldPassword, new_password: newPassword })
+                });
+                const result = await res.json();
+
+                if (result.success) {
+                    showToast('密碼已成功更新！');
+                    document.getElementById('oldPassword').value = '';
+                    document.getElementById('newPassword').value = '';
+                    document.getElementById('confirmPassword').value = '';
+                } else {
+                    showToast(result.message || '更變密碼失敗', 'error');
+                }
+            } catch (e) {
+                console.error(e);
+                showToast('變更密碼發生錯誤', 'error');
+            }
+        }
+
+        // 頁面初始化
+        loadSettings();
+    </script>
+</body>
+</html>

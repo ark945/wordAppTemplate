@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <title>匯入單字 - 英文單字小學堂</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <div class="container">
+        <div class="card">
+            <a href="{{ url_for('index') }}">← 返回主頁</a>
+            <h1>📄 匯入 PDF 單字</h1>
+            <p>請上傳包含單字表的 PDF 檔案。</p>
+
+            <section style="margin-top: 20px;">
+                <h3>Step 1: 上傳到雲端儲存</h3>
+                <input type="file" id="fileInput" accept=".pdf" multiple>
+                <button onclick="uploadFile()" id="uploadBtn" class="btn btn-primary">上傳檔案</button>
+            </section>
+
+            <section style="margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px;">
+                <h3>Step 2: 從雲端同步到資料庫</h3>
+                <p>上傳多個檔案後，點擊下方按鈕開始解析內容。</p>
+                <button onclick="reimport()" id="importBtn" class="btn">同步資料庫</button>
+            </section>
+
+            <div id="status" style="margin-top: 20px; font-weight: bold; white-space: pre-line;"></div>
+
+            <section style="margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px;">
+                <h3>☁️ 雲端 PDF 檔案</h3>
+                <p style="color:var(--text-muted); font-size:0.85rem;">這些是 Supabase Storage 中的 PDF，同步時會從這裡讀取。</p>
+                <div id="storageList" style="margin-top: 10px;">載入中...</div>
+            </section>
+
+            <section style="margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px;">
+                <h3>📋 已匯入的單元</h3>
+                <div id="unitList" style="margin-top: 10px;">載入中...</div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        async function uploadFile() {
+            const input = document.getElementById('fileInput');
+            if (input.files.length === 0) return alert('請選擇檔案');
+
+            const formData = new FormData();
+            for (let i = 0; i < input.files.length; i++) {
+                formData.append('file', input.files[i]);
+            }
+
+            document.getElementById('status').innerText = `上傳中（${input.files.length} 個檔案）...`;
+            try {
+                const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                document.getElementById('status').innerText = data.message;
+                input.value = '';
+                loadStorage();
+            } catch (e) {
+                document.getElementById('status').innerText = "上傳失敗: " + e;
+            }
+        }
+
+        async function reimport() {
+            document.getElementById('status').innerText = "正在解析雲端 PDF，請稍候（可能需要 1-2 分鐘）...";
+            try {
+                const res = await fetch('/api/reimport', { method: 'POST' });
+                const contentType = res.headers.get('content-type') || '';
+                if (!res.ok || !contentType.includes('application/json')) {
+                    document.getElementById('status').innerText =
+                        `同步失敗: 伺服器回應異常 (HTTP ${res.status})。可能是超時，請稍後再試一次。`;
+                    return;
+                }
+                const data = await res.json();
+                document.getElementById('status').innerText = data.message;
+                if (data.success) {
+                    loadUnits();
+                    loadStorage();
+                }
+            } catch (e) {
+                document.getElementById('status').innerText = "同步失敗: " + e;
+            }
+        }
+
+        // ===== 雲端 Storage 管理 =====
+        async function loadStorage() {
+            const container = document.getElementById('storageList');
+            try {
+                const res = await fetch('/api/storage');
+                const files = await res.json();
+                if (files.error) {
+                    container.innerHTML = `<p style="color:var(--error);">載入失敗: ${files.error}</p>`;
+                    return;
+                }
+                if (files.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-muted);">雲端沒有任何 PDF 檔案。</p>';
+                    return;
+                }
+                container.innerHTML = files.map(f => {
+                    const safeName = f.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const baseName = f.name.replace(/\.pdf$/i, '');
+                    const sizeKB = f.size ? (f.size / 1024).toFixed(1) + ' KB' : '';
+                    return `
+                    <div id="sf-${safeName}" style="display:flex; justify-content:space-between; align-items:center; 
+                                padding:10px 16px; border:1px solid var(--border-color); border-radius:10px; margin-bottom:6px;
+                                background: var(--card-bg, #f9fafb);">
+                        <span class="sf-label">📎 <strong>${f.name}</strong> <span style="color:var(--text-muted); font-size:0.85rem;">${sizeKB}</span>
+                            <br><span style="color:var(--text-muted); font-size:0.8rem;">→ 同步後產生：${baseName.toUpperCase()}</span>
+                        </span>
+                        <span class="sf-edit" style="display:none;">
+                            <input type="text" value="${baseName}" style="padding:4px 8px; border:1px solid var(--border-color); border-radius:6px; font-size:0.9rem; width:160px;">
+                            <span style="color:var(--text-muted); font-size:0.85rem;">.pdf</span>
+                            <button onclick="confirmStorageRename('${safeName}', this)" class="btn" 
+                                    style="background:#dcfce7; color:#16a34a; padding:5px 10px; font-size:0.8rem; margin-left:4px;">✓</button>
+                            <button onclick="cancelStorageRename('${safeName}')" class="btn" 
+                                    style="background:#f3f4f6; color:#6b7280; padding:5px 10px; font-size:0.8rem; margin-left:2px;">✕</button>
+                        </span>
+                        <span class="sf-actions">
+                            <button onclick="startStorageRename('${safeName}')" class="btn" 
+                                    style="background:#dbeafe; color:#2563eb; padding:5px 12px; font-size:0.8rem; margin-right:4px;">✏️ 更名</button>
+                            <button onclick="deleteStorageFile('${safeName}')" class="btn" 
+                                    style="background:#fee2e2; color:#dc2626; padding:5px 12px; font-size:0.8rem;">🗑 刪除</button>
+                        </span>
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                container.innerHTML = '<p style="color:var(--error);">載入失敗: ' + e + '</p>';
+            }
+        }
+
+        function startStorageRename(filename) {
+            const row = document.getElementById('sf-' + filename);
+            if (!row) return;
+            row.querySelector('.sf-label').style.display = 'none';
+            row.querySelector('.sf-actions').style.display = 'none';
+            row.querySelector('.sf-edit').style.display = 'inline-flex';
+            const input = row.querySelector('.sf-edit input');
+            input.focus();
+            input.select();
+        }
+
+        function cancelStorageRename(filename) {
+            const row = document.getElementById('sf-' + filename);
+            if (!row) return;
+            row.querySelector('.sf-label').style.display = '';
+            row.querySelector('.sf-actions').style.display = '';
+            row.querySelector('.sf-edit').style.display = 'none';
+        }
+
+        async function confirmStorageRename(filename, btn) {
+            const row = document.getElementById('sf-' + filename);
+            if (!row) return;
+            const input = row.querySelector('.sf-edit input');
+            let newName = input.value.trim();
+            if (!newName) return alert('檔名不能為空');
+            if (!newName.toLowerCase().endsWith('.pdf')) newName += '.pdf';
+            if (newName === filename) { cancelStorageRename(filename); return; }
+
+            document.getElementById('status').innerText = `正在更名...`;
+            try {
+                const res = await fetch('/api/storage/' + encodeURIComponent(filename), {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ new_name: newName })
+                });
+                const data = await res.json();
+                document.getElementById('status').innerText = data.message;
+                if (data.success) loadStorage();
+            } catch (e) {
+                document.getElementById('status').innerText = "更名失敗: " + e;
+            }
+        }
+
+        async function deleteStorageFile(filename) {
+            if (!confirm(`確定要從雲端刪除「${filename}」嗎？\n（僅刪除 PDF 檔案，不影響已匯入的單元資料）`)) return;
+            document.getElementById('status').innerText = `正在刪除 ${filename}...`;
+            try {
+                const res = await fetch('/api/storage/' + encodeURIComponent(filename), { method: 'DELETE' });
+                const data = await res.json();
+                document.getElementById('status').innerText = data.message;
+                loadStorage();
+            } catch (e) {
+                document.getElementById('status').innerText = "刪除失敗: " + e;
+            }
+        }
+
+        // ===== 已匯入單元管理 =====
+        async function loadUnits() {
+            const container = document.getElementById('unitList');
+            try {
+                const res = await fetch('/api/all_words');
+                const words = await res.json();
+                const unitMap = {};
+                words.forEach(w => {
+                    if (!unitMap[w.unit]) unitMap[w.unit] = 0;
+                    unitMap[w.unit]++;
+                });
+                const units = Object.keys(unitMap).sort();
+                if (units.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-muted);">尚未匯入任何單元。</p>';
+                    return;
+                }
+                container.innerHTML = units.map(u => {
+                    const safeU = u.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    return `
+                    <div id="unit-row-${safeU}" style="display:flex; justify-content:space-between; align-items:center; 
+                                padding:12px 16px; border:1px solid var(--border-color); border-radius:10px; margin-bottom:8px;">
+                        <span class="unit-label"><strong>${u}</strong> <span style="color:var(--text-muted); font-size:0.9rem;">(${unitMap[u]} 個單字)</span></span>
+                        <span class="unit-edit" style="display:none;">
+                            <input type="text" value="${u}" style="padding:4px 8px; border:1px solid var(--border-color); border-radius:6px; font-size:0.95rem; width:200px;">
+                            <button onclick="confirmRename('${safeU}', this)" class="btn" 
+                                    style="background:#dcfce7; color:#16a34a; padding:6px 10px; font-size:0.85rem; margin-left:4px;">✓</button>
+                            <button onclick="cancelRename('${safeU}')" class="btn" 
+                                    style="background:#f3f4f6; color:#6b7280; padding:6px 10px; font-size:0.85rem; margin-left:2px;">✕</button>
+                        </span>
+                        <span class="unit-actions">
+                            <button onclick="startRename('${safeU}')" class="btn" 
+                                    style="background:#dbeafe; color:#2563eb; padding:6px 14px; font-size:0.85rem; margin-right:4px;">✏️ 更名</button>
+                            <button onclick="deleteUnit('${safeU}')" class="btn" 
+                                    style="background:#fee2e2; color:#dc2626; padding:6px 14px; font-size:0.85rem;">🗑 刪除</button>
+                        </span>
+                    </div>`;
+                }).join('');
+            } catch (e) {
+                container.innerHTML = '<p style="color:var(--error);">載入失敗: ' + e + '</p>';
+            }
+        }
+
+        function startRename(unitName) {
+            const row = document.getElementById('unit-row-' + unitName);
+            if (!row) return;
+            row.querySelector('.unit-label').style.display = 'none';
+            row.querySelector('.unit-actions').style.display = 'none';
+            row.querySelector('.unit-edit').style.display = 'inline-flex';
+            const input = row.querySelector('.unit-edit input');
+            input.focus();
+            input.select();
+        }
+
+        function cancelRename(unitName) {
+            const row = document.getElementById('unit-row-' + unitName);
+            if (!row) return;
+            row.querySelector('.unit-label').style.display = '';
+            row.querySelector('.unit-actions').style.display = '';
+            row.querySelector('.unit-edit').style.display = 'none';
+        }
+
+        async function confirmRename(unitName, btn) {
+            const row = document.getElementById('unit-row-' + unitName);
+            if (!row) return;
+            const input = row.querySelector('.unit-edit input');
+            const newName = input.value.trim();
+            if (!newName) return alert('名稱不能為空');
+            if (newName === unitName) { cancelRename(unitName); return; }
+
+            document.getElementById('status').innerText = `正在更名...`;
+            try {
+                const res = await fetch('/api/units/' + encodeURIComponent(unitName), {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ new_name: newName })
+                });
+                const data = await res.json();
+                document.getElementById('status').innerText = data.message;
+                if (data.success) loadUnits();
+            } catch (e) {
+                document.getElementById('status').innerText = "更名失敗: " + e;
+            }
+        }
+
+        async function deleteUnit(unitName) {
+            if (!confirm(`確定要刪除「${unitName}」嗎？（僅刪除資料庫中的單字資料）`)) return;
+            document.getElementById('status').innerText = `正在刪除 ${unitName}...`;
+            try {
+                const res = await fetch('/api/units/' + encodeURIComponent(unitName), { method: 'DELETE' });
+                const data = await res.json();
+                document.getElementById('status').innerText = data.message;
+                loadUnits();
+            } catch (e) {
+                document.getElementById('status').innerText = "刪除失敗: " + e;
+            }
+        }
+
+        // 頁面載入時同時載入兩個區塊
+        loadStorage();
+        loadUnits();
+    </script>
+</body>
+
+</html>

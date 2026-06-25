@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <title>單字列表 - 英文單字小學堂</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        tr:hover {
+            background-color: #f8fafc;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container" style="max-width: 1000px;">
+        <div class="card">
+            <a href="{{ url_for('index') }}">← 返回主頁</a>
+            <h1>📋 單字總覽：{{ unit }}</h1>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>單字</th>
+                        <th>詞性</th>
+                        <th>中文解釋</th>
+                        <th>例句</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for w in words %}
+                    <tr>
+                        <td><strong>{{ w.word }}</strong></td>
+                        <td><i>{{ w.pos }}</i></td>
+                        <td>{{ w.definition }}</td>
+                        <td style="font-size: 0.9rem; color: var(--text-muted);">{{ w.sentence }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+
+</html>

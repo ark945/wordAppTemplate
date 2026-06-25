@@ -1,0 +1,418 @@
+import sys
+
+import os
+import sqlite3
+import random
+import re
+import time
+import json
+import socket
+import threading
+import smtplib
+from datetime import datetime
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+from flask import Flask, render_template, request, jsonify, send_file, Response, redirect, url_for
+from gtts import gTTS
+import pdfplumber
+
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
+app = Flask(__name__, 
+            template_folder=resource_path('templates'),
+            static_folder=resource_path('static'))
+app.secret_key = 'your_secret_key_here'
+
+# ==========================================
+# 1. Database Manager
+# ==========================================
+class DatabaseManager:
+    def __init__(self, db_name="vocab.db"):
+        self.db_name = db_name
+        self.create_tables()
+
+    def get_connection(self):
+        conn = sqlite3.connect(self.db_name)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+    def create_tables(self):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS words (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                unit TEXT,
+                word TEXT,
+                pos TEXT,
+                definition TEXT,
+                sentence TEXT,
+                correct_count INTEGER DEFAULT 0,
+                wrong_count INTEGER DEFAULT 0,
+                UNIQUE(unit, word)
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.commit()
+        conn.close()
+
+    def add_word(self, unit, word, pos, definition, sentence):
+        conn = self.get_connection()
+        try:
+            conn.execute('''
+                INSERT OR IGNORE INTO words (unit, word, pos, definition, sentence)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (unit, word, pos, definition, sentence))
+            conn.commit()
+        except Exception as e:
+            print(f"DB Error: {e}")
+        finally:
+            conn.close()
+
+    def clear_all_data(self):
+        conn = self.get_connection()
+        try:
+            conn.execute("DELETE FROM words")
+            conn.execute("DELETE FROM sqlite_sequence WHERE name='words'")
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"Clear Data Error: {e}")
+            return False
+        finally:
+            conn.close()
+
+    def get_units(self):
+        conn = self.get_connection()
+        cursor = conn.execute("SELECT DISTINCT unit FROM words ORDER BY unit")
+        units = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        return units
+
+    def get_words_by_unit(self, unit_name):
+        conn = self.get_connection()
+        cursor = conn.execute("SELECT * FROM words WHERE unit = ? ORDER BY id ASC", (unit_name,))
+        words = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        return words
+
+    def get_all_words(self):
+        conn = self.get_connection()
+        cursor = conn.execute("SELECT * FROM words")
+        words = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        return words
+
+    # --- User APIs ---
+    def add_user(self, name):
+        conn = self.get_connection()
+        try:
+            conn.execute("INSERT INTO users (name) VALUES (?)", (name,))
+            conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            return False
+        except Exception as e:
+            print(f"Add User Error: {e}")
+            return False
+        finally:
+            conn.close()
+
+    def get_users(self):
+        conn = self.get_connection()
+        cursor = conn.execute("SELECT id, name FROM users ORDER BY id")
+        users = [{"id": row[0], "name": row[1]} for row in cursor.fetchall()]
+        conn.close()
+        return users
+
+    def delete_user(self, user_id):
+        conn = self.get_connection()
+        try:
+            conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            conn.commit()
+        except Exception as e:
+            print(f"Delete User Error: {e}")
+        finally:
+            conn.close()
+
+db = DatabaseManager()
+
+# ==========================================
+# 2. Config & Helpers
+# ==========================================
+CONFIG_FILE = "config.json"
+
+def load_config():
+    if not os.path.exists(CONFIG_FILE):
+        default_config = {
+            "email_settings": {
+                "enable": False,
+                "sender_email": "abc@gmail.com",
+                "app_password": "",
+                "receivers": ["abc@gmail.com"]
+            }
+        }
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(default_config, f, indent=4, ensure_ascii=False)
+        return default_config
+    try:
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        return {}
+
+def get_local_ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except:
+        return "127.0.0.1"
+
+# ==========================================
+# 3. Routes
+# ==========================================
+
+@app.route('/')
+def index():
+    units = db.get_units()
+    return render_template('index.html', units=units)
+
+@app.route('/list/<unit>')
+def word_list(unit):
+    words = db.get_words_by_unit(unit)
+    return render_template('list.html', unit=unit, words=words)
+
+@app.route('/study/<unit>')
+def study_mode(unit):
+    return render_template('study.html', unit=unit)
+
+@app.route('/quiz/<mode>/<unit>')
+def quiz_mode(mode, unit):
+    return render_template('quiz.html', mode=mode, unit=unit)
+
+@app.route('/import_page')
+def import_page():
+    return render_template('import.html')
+
+@app.route('/manage_users')
+def manage_users_page():
+    return render_template('manage_users.html')
+
+# --- API Endpoints ---
+
+@app.route('/api/words/<unit>')
+def api_get_words(unit):
+    words = db.get_words_by_unit(unit)
+    # Fix sentence spacing
+    for w in words:
+        if w['sentence']:
+            w['sentence'] = w['sentence'].replace('\n', ' ')
+    return jsonify(words)
+
+@app.route('/api/all_words')
+def api_get_all_words():
+    words = db.get_all_words()
+    return jsonify(words)
+
+@app.route('/api/tts')
+def api_tts():
+    text = request.args.get('text', '')
+    if not text:
+        return "No text provided", 400
+    
+    # Remove Chinese characters for TTS
+    clean_text = text
+    if "(" in clean_text: clean_text = clean_text.split("(")[0]
+    elif "（" in clean_text: clean_text = clean_text.split("（")[0]
+    match = re.search(r'[\u4e00-\u9fff]', clean_text)
+    if match: clean_text = clean_text[:match.start()]
+    clean_text = clean_text.strip()
+    
+    try:
+        tts = gTTS(text=clean_text, lang='en', tld='com')
+        # Save to a temporary file
+        filename = f"tts_{int(time.time()*1000)}.mp3"
+        filepath = os.path.join("static", filename)
+        tts.save(filepath)
+        
+        # Cleanup old files
+        for f in os.listdir("static"):
+            if f.startswith("tts_") and f.endswith(".mp3"):
+                try:
+                    f_path = os.path.join("static", f)
+                    if time.time() - os.path.getmtime(f_path) > 60: # Delete older than 60s
+                        os.remove(f_path)
+                except: pass
+                
+        return jsonify({"url": f"/static/{filename}"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/reimport', methods=['POST'])
+def api_reimport():
+    data_dir = "data"
+    if not os.path.exists(data_dir):
+        return jsonify({"success": False, "message": "No data directory found"})
+    
+    try:
+        db.clear_all_data()
+        pdf_files = [f for f in os.listdir(data_dir) if f.lower().endswith(".pdf")]
+        count = 0
+        for filename in pdf_files:
+            base_name = os.path.splitext(filename)[0]
+            unit_name = f"單元 {base_name.upper()}"
+            pdf_path = os.path.join(data_dir, filename)
+            
+            with pdfplumber.open(pdf_path) as pdf:
+                for page in pdf.pages:
+                    table = page.extract_table()
+                    if table:
+                        for row in table:
+                            if row and len(row) >= 5 and row[1] and row[1].strip():
+                                cell_text = row[1].strip()
+                                if cell_text == "Word" or "單字" in cell_text: continue
+                                db.add_word(
+                                    unit=unit_name,
+                                    word=row[1].strip(),
+                                    pos=row[2].strip() if row[2] else "",
+                                    definition=row[3].strip() if row[3] else "",
+                                    sentence=row[4].strip().replace("\n", " ") if row[4] else ""
+                                )
+                                count += 1
+        return jsonify({"success": True, "message": f"Imported {count} words from {len(pdf_files)} files."})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})
+
+@app.route('/api/users', methods=['GET'])
+def api_get_users():
+    return jsonify(db.get_users())
+
+@app.route('/api/users', methods=['POST'])
+def api_add_user():
+    data = request.json
+    name = data.get("name", "").strip()
+    if not name: return jsonify({"success": False, "message": "Empty name"})
+    if db.add_user(name):
+        return jsonify({"success": True})
+    return jsonify({"success": False, "message": "Duplicate or error"})
+
+@app.route('/api/users/<int:user_id>', methods=['DELETE'])
+def api_delete_user(user_id):
+    db.delete_user(user_id)
+    return jsonify({"success": True})
+
+@app.route('/api/send_report', methods=['POST'])
+def send_report():
+    data = request.json
+    unit_name = data.get('unit')
+    score = data.get('score')
+    total = data.get('total')
+    mode = data.get('mode')
+    user_name = data.get('user_name', '訪客') # New field
+    wrong_words_list = data.get('wrong_words_list', []) # New field
+
+    cfg = load_config()
+    settings = cfg.get("email_settings", {})
+    
+    if not settings.get("enable"):
+        return jsonify({"success": False, "message": "Email disabled"})
+    
+    sender = settings.get("sender_email")
+    password = settings.get("app_password")
+    receivers = settings.get("receivers")
+    
+    if not password or len(password) < 10:
+        return jsonify({"success": False, "message": "Invalid password"})
+        
+    subject = f"[單字小學堂] 測驗完成通知 - {unit_name} ({user_name})"
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    wrong_words_html = ""
+    if wrong_words_list:
+        rows = ""
+        for w in wrong_words_list:
+            # handle if 'def' key is different or missing
+            definition = w.get('def') or w.get('definition', '')
+            rows += f"<tr><td style='border:1px solid #ddd;padding:5px;'>{w['word']}</td><td style='border:1px solid #ddd;padding:5px;'>{definition}</td></tr>"
+        
+        wrong_words_html = f"""
+        <h3>⚠️ 錯題檢討</h3>
+        <table style='border-collapse:collapse; width:100%; max-width:600px;'>
+            <tr style='background-color:#f2f2f2;'>
+                <th style='border:1px solid #ddd;padding:8px;'>單字</th>
+                <th style='border:1px solid #ddd;padding:8px;'>中文解釋</th>
+            </tr>
+            {rows}
+        </table>
+        """
+    else:
+        wrong_words_html = "<p style='color:green'>🎉 太棒了！本次測驗沒有答錯的題目！</p>"
+    
+    body = f"""
+    <html>
+    <body>
+        <h2>🎉 測驗完成通知</h2>
+        <p><strong>使用者：</strong> {user_name}</p>
+        <p><strong>時間：</strong> {current_time}</p>
+        <p><strong>單元：</strong> {unit_name}</p>
+        <p><strong>模式：</strong> {mode}</p>
+        <hr>
+        <h3>📊 成績報告</h3>
+        <ul>
+            <li><strong>答對題數：</strong> <span style="color:green">{score}</span></li>
+            <li><strong>總題數：</strong> {total}</li>
+            <li><strong>正確率：</strong> {int((score/total)*100) if total > 0 else 0}%</li>
+        </ul>
+        <hr>
+        {wrong_words_html}
+        <p>繼續加油！💪</p>
+    </body>
+    </html>
+    """
+    
+    def _send():
+        try:
+            msg = MIMEMultipart()
+            msg['From'] = sender
+            msg['Subject'] = subject
+            msg.attach(MIMEText(body, 'html'))
+            
+            server = smtplib.SMTP('smtp.gmail.com', 587)
+            server.starttls()
+            server.login(sender, password)
+            msg['To'] = ", ".join(receivers)
+            server.sendmail(sender, receivers, msg.as_string())
+            server.quit()
+        except Exception as e:
+            print(f"Email error: {e}")
+
+    threading.Thread(target=_send, daemon=True).start()
+    return jsonify({"success": True})
+
+if __name__ == '__main__':
+    load_config() # Create config.json if not exists
+    ip = get_local_ip()
+    print(f"========================================")
+    print(f" 網頁版已啟動！")
+    print(f" 請在瀏覽器輸入以下網址 (本機): http://localhost:5000")
+    print(f" 請在手機/其他電腦輸入 (Wi-Fi): http://{ip}:5000")
+    print(f"========================================")
+    app.run(host='0.0.0.0', port=5000, debug=True)

@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+env/
+
+# Sensitive data
+config.json
+memo.txt
+.env
+test_supabase.py
+
+# Legacy / Large files
+vocab.db
+data/
+*.pdf
+*.zip
+*.rar
+*.exe
+*.spec
+
+# TTS temp files
+static/tts_*.mp3
+voice_*.mp3
+
+# IDE
+.vscode/
+.idea/
+.gemini/
+brain/
+
+# Gmail API Credentials
+credentials.json
+token.json
+

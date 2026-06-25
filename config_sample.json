@@ -1,0 +1,14 @@
+{
+    "supabase_settings": {
+        "url": "https://your-project.supabase.co",
+        "key": "your-anon-or-service-key"
+    },
+    "email_settings": {
+        "enable": true,
+        "sender_email": "your-email@gmail.com",
+        "app_password": "your-16-char-app-password",
+        "receivers": [
+            "receiver-email@gmail.com"
+        ]
+    }
+}

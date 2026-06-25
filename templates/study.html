@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <title>單字卡模式 - 英文單字小學堂</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <div class="container">
+        <div class="card">
+            <a href="{{ url_for('index') }}">← 返回主頁</a>
+            <h2 id="unit-title">正在載入學習單元...</h2>
+            <div id="progress" style="margin-bottom: 20px;"></div>
+
+            <div class="card word-card">
+                <div id="word" class="word-main">---</div>
+                <div id="pos" class="pos">---</div>
+                <div id="definition" class="definition">---</div>
+                <div style="margin-top: 20px;">
+                    <button onclick="playAudio('word')" class="btn">🔊 唸單字</button>
+                </div>
+                <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+                <p id="sentence" style="font-weight: 500; min-height: 50px; font-size: 1.15rem; line-height: 1.8;">---</p>
+                <button onclick="playAudio('sentence')" class="btn">🗣️ 唸例句</button>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; margin-top: 20px;">
+                <button onclick="prevWord()" class="btn">上一個</button>
+                <button onclick="nextWord()" class="btn btn-primary">下一個</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const unit = "{{ unit }}";
+        let words = [];
+        let currentIndex = 0;
+
+        async function init() {
+            const res = await fetch(`/api/words/${unit}`);
+            words = await res.json();
+            renderWord();
+        }
+
+        function renderWord() {
+            if (words.length === 0) return;
+            const w = words[currentIndex];
+            document.getElementById('unit-title').innerText = `學習單元：${unit}`;
+            document.getElementById('progress').innerText = `進度：${currentIndex + 1} / ${words.length}`;
+            document.getElementById('word').innerText = w.word;
+            document.getElementById('pos').innerText = w.pos;
+            document.getElementById('definition').innerText = w.definition;
+            // 將中文部分換行顯示
+            const sentenceEl = document.getElementById('sentence');
+            const raw = w.sentence || '';
+            // 找到中文括號或第一個中文字的位置，插入換行
+            const match = raw.match(/[（(][\u4e00-\u9fff]/);
+            if (match) {
+                const idx = raw.indexOf(match[0]);
+                sentenceEl.innerHTML = raw.substring(0, idx) + '<br>' + raw.substring(idx);
+            } else {
+                sentenceEl.innerText = raw;
+            }
+        }
+
+        function nextWord() {
+            if (currentIndex < words.length - 1) {
+                currentIndex++;
+                renderWord();
+            }
+        }
+
+        function prevWord() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                renderWord();
+            }
+        }
+
+        async function playAudio(type) {
+            const text = type === 'word' ? words[currentIndex].word : words[currentIndex].sentence;
+            try {
+                const res = await fetch(`/api/tts?text=${encodeURIComponent(text)}`);
+                const data = await res.json();
+                if (data.url) new Audio(data.url).play();
+            } catch (e) {
+                console.error('TTS error:', e);
+            }
+        }
+
+        init();
+    </script>
+</body>
+
+</html>

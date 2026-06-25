@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <title>管理使用者 - 英文單字小學堂</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <div class="container">
+        <div class="card">
+            <a href="{{ url_for('index') }}">← 返回主頁</a>
+            <h1>👥 管理使用者</h1>
+
+            <div style="margin-bottom: 30px; display: flex; gap: 10px;">
+                <input type="text" id="userName" placeholder="輸入姓名" class="card"
+                    style="margin:0; flex:1; padding:10px;">
+                <button onclick="addUser()" class="btn btn-primary">新增使用者</button>
+            </div>
+
+            <div id="userList">
+                <!-- Users will be loaded here -->
+            </div>
+            
+            <hr style="margin: 20px 0;">
+
+            <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px;">
+                <h3>📧 Email 偵錯工具</h3>
+                <p>點擊下方按鈕，系統將嘗試向設定的收件人發送一封測試信件。</p>
+                <button onclick="sendTestEmail()" class="btn" style="background-color: #28a745; color: white;">發送測試 Email</button>
+                <p id="emailResult" style="margin-top: 10px; font-weight: bold;"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function sendTestEmail() {
+             const resultP = document.getElementById('emailResult');
+             resultP.innerText = "發送中...";
+             resultP.style.color = "blue";
+             
+             try {
+                 const res = await fetch('/api/test_email', { method: 'POST' });
+                 const data = await res.json();
+                 if (data.success) {
+                     resultP.innerText = "✅ 發送成功！ " + (data.message || "");
+                     resultP.style.color = "green";
+                 } else {
+                     resultP.innerText = "❌ 發送失敗: " + data.message;
+                     resultP.style.color = "red";
+                 }
+             } catch (e) {
+                 resultP.innerText = "❌ 請求錯誤: " + e;
+                 resultP.style.color = "red";
+             }
+        }
+
+        async function loadUsers() {
+            const res = await fetch('/api/users');
+            const users = await res.json();
+            const list = document.getElementById('userList');
+            list.innerHTML = users.map(u => `
+                <div class="card" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px;">
+                    <span>${u.name}</span>
+                    <button onclick="deleteUser(${u.id})" class="btn" style="color:red">刪除</button>
+                </div>
+            `).join('');
+        }
+
+        async function addUser() {
+            const name = document.getElementById('userName').value;
+            if (!name) return;
+            await fetch('/api/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            });
+            document.getElementById('userName').value = "";
+            loadUsers();
+        }
+
+        async function deleteUser(id) {
+            if (!confirm('確定刪除？')) return;
+            await fetch(`/api/users/${id}`, { method: 'DELETE' });
+            loadUsers();
+        }
+
+        loadUsers();
+    </script>
+</body>
+
+</html>
