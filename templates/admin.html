@@ -212,16 +212,6 @@
                     <span style="font-weight: 600; font-size: 1rem;">啟用測驗完成 Email 通知</span>
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="senderEmail">寄件者信箱 (Sender Email)</label>
-                        <input type="email" id="senderEmail" class="form-control" placeholder="example@gmail.com">
-                    </div>
-                    <div class="form-group">
-                        <label for="appPassword">郵件授權密碼 (App Password)</label>
-                        <input type="password" id="appPassword" class="form-control" placeholder="若使用環境變數設定則留空">
-                    </div>
-                </div>
                 <div class="form-group" style="margin-top: 10px;">
                     <label for="receivers">收件者信箱 (多個請用逗號隔開)</label>
                     <input type="text" id="receivers" class="form-control" placeholder="parent1@example.com, parent2@example.com">
@@ -316,9 +306,7 @@
                 // 填入 Email 設定
                 const eSettings = config.email_settings || {};
                 document.getElementById('emailEnable').checked = eSettings.enable || false;
-                document.getElementById('senderEmail').value = eSettings.sender_email || '';
                 document.getElementById('receivers').value = (eSettings.receivers || []).join(', ');
-                document.getElementById('appPassword').value = ''; // 密碼欄位只供寫入，讀取時維持空白
 
             } catch (e) {
                 console.error(e);
@@ -347,14 +335,8 @@
 
             const email_settings = {
                 enable: document.getElementById('emailEnable').checked,
-                sender_email: document.getElementById('senderEmail').value.trim(),
                 receivers: receivers
             };
-
-            const appPwd = document.getElementById('appPassword').value.trim();
-            if (appPwd) {
-                email_settings.app_password = appPwd;
-            }
 
             try {
                 const res = await fetch('/api/admin/config', {

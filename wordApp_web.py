@@ -278,19 +278,15 @@ def api_admin_config():
                 "required_days": 2,
                 "selected_units": []
             }
-        e_settings = db.get_config("email_settings")
-        if not e_settings:
-            e_settings = {
-                "sender_email": "",
-                "receivers": [],
-                "enable": False
-            }
-        if "app_password" in e_settings:
-            del e_settings["app_password"]
+        e_settings = db.get_config("email_settings") or {}
+        clean_email_settings = {
+            "enable": e_settings.get("enable", False),
+            "receivers": e_settings.get("receivers", [])
+        }
             
         config = {
             "review_settings": r_settings,
-            "email_settings": e_settings
+            "email_settings": clean_email_settings
         }
         available_units = db.get_units()
         return jsonify({
@@ -305,9 +301,6 @@ def api_admin_config():
         if review_settings:
             db.set_config("review_settings", review_settings)
         if email_settings:
-            existing_email = db.get_config("email_settings") or {}
-            if "app_password" not in email_settings and "app_password" in existing_email:
-                email_settings["app_password"] = existing_email["app_password"]
             db.set_config("email_settings", email_settings)
         return jsonify({"success": True})
 
@@ -689,32 +682,28 @@ def get_gmail_service():
 
 def get_email_config():
     db_email = db.get_config("email_settings") or {}
-    sender = db_email.get("sender_email")
-    password = db_email.get("app_password")
+    sender = os.environ.get("GMAIL_USER", "WordApp")
     receivers = db_email.get("receivers", [])
     enable_email = db_email.get("enable", False)
     
-    if not sender:
+    if not sender or not receivers:
         settings = local_cfg.get("email_settings", {})
         if IS_CLOUD:
             sender = os.environ.get("GMAIL_USER", "WordApp")
-            password = "oauth-token-used"
             receivers_raw = os.environ.get("RECEIVERS", "")
             receivers = [r.strip() for r in receivers_raw.split(",")] if receivers_raw else []
             enable_email = os.environ.get("ENABLE_EMAIL", "true").lower() == "true"
         else:
             sender = settings.get("sender_email")
-            password = settings.get("app_password")
             receivers = settings.get("receivers", [])
             enable_email = settings.get("enable", False)
             
-    return sender, password, receivers, enable_email
+    return sender, receivers, enable_email
 
-def send_email_message(sender, password, receivers, subject, body_html):
+def send_email_message(sender, receivers, subject, body_html):
     import base64
     from email.mime.text import MIMEText
     from email.mime.multipart import MIMEMultipart
-    import smtplib
     
     service = get_gmail_service()
     if service:
@@ -728,22 +717,8 @@ def send_email_message(sender, password, receivers, subject, body_html):
         message = {'raw': raw_message}
         sent_message = service.users().messages().send(userId="me", body=message).execute()
         return f"Gmail API (ID: {sent_message['id']})"
-    elif sender and password and password != "oauth-token-used":
-        msg = MIMEMultipart()
-        msg['From'] = sender
-        msg['Subject'] = subject
-        msg.attach(MIMEText(body_html, 'html'))
-        target_receivers = receivers if isinstance(receivers, list) else [receivers]
-        msg['To'] = ", ".join(target_receivers)
-        
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.starttls()
-        server.login(sender, password)
-        server.sendmail(sender, target_receivers, msg.as_string())
-        server.quit()
-        return "SMTP Server"
     else:
-        raise Exception("未設定 Gmail API OAuth，且無 SMTP 密碼，無法寄信。")
+        raise Exception("未設定 Gmail API OAuth (請在環境變數中設定 GMAIL_CREDENTIALS)，無法寄信。")
 
 
 @app.route('/api/test_email', methods=['POST'])
@@ -753,14 +728,14 @@ def api_test_email():
     logger = logging.getLogger(__name__)
 
     try:
-        sender, password, receivers, enable_email = get_email_config()
+        sender, receivers, enable_email = get_email_config()
         if not receivers:
             return jsonify({"success": False, "message": "未設定收件者信箱"})
             
         subject = "[測試] Word App Email Debug"
         body_html = "<h1>🎉 Email 功能測試成功！</h1><p>這是一封來自 WordApp 的測試信。</p>"
         
-        method = send_email_message(sender, password, receivers, subject, body_html)
+        method = send_email_message(sender, receivers, subject, body_html)
         return jsonify({
             "success": True,
             "message": f"測試郵件已成功經由 {method} 送出至：{', '.join(receivers)}"
@@ -789,7 +764,7 @@ def send_report():
     db_mode = mode_mapping.get(mode, "quiz")
     db.add_quiz_result(user_name, unit_name, db_mode, score, total)
 
-    sender, password, receivers, enable_email = get_email_config()
+    sender, receivers, enable_email = get_email_config()
     if not enable_email:
         return jsonify({"success": False, "message": "Email disabled"})
     if not receivers:
@@ -846,7 +821,7 @@ def send_report():
         logger = logging.getLogger(__name__)
         try:
             logger.info("Sending report email in background...")
-            method = send_email_message(sender, password, receivers, subject, body)
+            method = send_email_message(sender, receivers, subject, body)
             logger.info(f"Report email sent successfully via {method}")
         except Exception as e:
             logger.exception("Email API Critical Error")
