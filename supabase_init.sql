@@ -65,4 +65,9 @@ DROP POLICY IF EXISTS "Allow all for service_role" ON system_config;
 CREATE POLICY "Allow all for service_role" ON system_config
   FOR ALL USING (true) WITH CHECK (true);
 
-
+----測試用
+-- 1. 先清除 W52 單元原有的所有單字
+DELETE FROM words WHERE unit = 'W52';
+-- 2. 在 W52 中只新增一個測試單字
+INSERT INTO words (unit, word, pos, definition, sentence) 
+VALUES ('W52', 'apple', 'n.', '蘋果', 'I like to eat a red apple.');
