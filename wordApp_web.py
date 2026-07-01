@@ -373,8 +373,9 @@ def word_list(unit):
 def study_mode(unit):
     return render_template('study.html', unit=unit)
 
+@app.route('/quiz/<unit>')
 @app.route('/quiz/<mode>/<unit>')
-def quiz_mode(mode, unit):
+def quiz_mode(unit, mode=None):
     return render_template('quiz.html', mode=mode, unit=unit)
 
 @app.route('/import_page')

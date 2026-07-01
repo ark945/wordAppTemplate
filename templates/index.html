@@ -50,28 +50,32 @@
 
                 <div id="unit-list">
                     {% if units %}
-                    {% for unit in units %}
-                    <div class="unit-item" style="flex-direction: column; align-items: start; gap: 15px;">
-                        <div class="unit-name"
-                            style="border-bottom: 1px solid var(--border-color); width: 100%; padding-bottom: 10px; margin-bottom: 5px;">
-                            {{ unit }}</div>
-                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                            <a href="#" onclick="goStudy('{{ unit }}')" class="btn btn-secondary">📖 單字卡</a>
-                            <a href="#" onclick="goQuiz('{{ unit }}', 'quiz')" class="btn btn-primary"
-                                style="background-color: #6366f1;">選中文</a>
-                            <a href="#" onclick="goQuiz('{{ unit }}', 'reverse')" class="btn btn-primary"
-                                style="background-color: #8b5cf6;">選英文</a>
-                            <a href="#" onclick="goQuiz('{{ unit }}', 'spelling')" class="btn btn-primary"
-                                style="background-color: #ec4899;">拼字</a>
+                    <div class="unit-select-wrapper-homepage">
+                        <select id="unitSelector" class="unit-select-homepage" onchange="selectUnit(this.value)">
+                            <option value="">📚 請選擇學習單元...</option>
+                            {% for unit in units %}
+                            <option value="{{ unit }}">{{ unit }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- 動態呈現所選單元的卡片 -->
+                    <div id="selected-unit-card" class="selected-unit-card">
+                        <div class="unit-header-info">
+                            <div id="selected-unit-name" class="unit-name">--</div>
+                            <span id="selected-unit-count" class="unit-count-badge">0 單字</span>
+                        </div>
+                        <p style="color: var(--text-muted); font-size: 0.95rem; margin: 5px 0; font-weight: 500;">請選擇學習模式或進入測驗：</p>
+                        <div class="unit-action-group">
+                            <button id="btn-go-study" class="btn-action-study">📖 單字卡</button>
+                            <button id="btn-go-quiz" class="btn-action-quiz">✏️ 測驗模式</button>
                         </div>
                     </div>
-                    {% endfor %}
                     {% else %}
                     <div style="text-align: center; padding: 40px; color: var(--text-muted);">
                         <p style="font-size: 4rem; margin: 0;">📭</p>
                         <p>目前還沒有單字資料庫</p>
-                        <a href="{{ url_for('import_page') }}" class="btn btn-primary" style="margin-top: 10px;">立即匯入
-                            PDF</a>
+                        <a href="{{ url_for('import_page') }}" class="btn btn-primary" style="margin-top: 10px;">立即匯入 PDF</a>
                     </div>
                     {% endif %}
                 </div>
@@ -172,6 +176,37 @@
         function goQuiz(unit, mode) {
             const user = document.getElementById('currentUser').value;
             window.location.href = `/quiz/${mode}/${unit}?user=${encodeURIComponent(user)}`;
+        }
+
+        function goUnifiedQuiz(unit) {
+            const user = document.getElementById('currentUser').value;
+            window.location.href = `/quiz/${unit}?user=${encodeURIComponent(user)}`;
+        }
+
+        async function selectUnit(unit) {
+            const card = document.getElementById('selected-unit-card');
+            if (!unit) {
+                card.style.display = 'none';
+                return;
+            }
+            
+            document.getElementById('selected-unit-name').innerText = unit;
+            document.getElementById('selected-unit-count').innerText = '⏳ 載入中...';
+            
+            // Set buttons click handlers
+            document.getElementById('btn-go-study').onclick = () => goStudy(unit);
+            document.getElementById('btn-go-quiz').onclick = () => goUnifiedQuiz(unit);
+            
+            card.style.display = 'flex';
+            
+            try {
+                const res = await fetch(`/api/words/${unit}`);
+                const words = await res.json();
+                document.getElementById('selected-unit-count').innerText = `${words.length} 個單字`;
+            } catch (e) {
+                console.error(e);
+                document.getElementById('selected-unit-count').innerText = '載入失敗';
+            }
         }
 
         // Tab 切換與進度表資料拉取邏輯

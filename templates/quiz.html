@@ -40,7 +40,38 @@
 
 <body>
     <div class="container">
-        <div class="card" id="quiz-container">
+        <!-- 模式選擇畫面 -->
+        <div id="mode-select-container" class="card" style="display: none; max-width: 800px; margin: 0 auto;">
+            <a href="/" style="display: inline-block; text-decoration: none; color: var(--text-muted); font-weight: 600; margin-bottom: 20px;">← 返回首頁</a>
+            <h2 style="margin-bottom: 5px; border-bottom: none; padding-bottom: 0; color: var(--text-main); font-weight: 800;">✏️ 選擇測驗模式</h2>
+            <p style="color: var(--text-muted); margin-bottom: 25px;">單元：<strong id="mode-select-unit-name" style="color: var(--primary-color);"></strong></p>
+            
+            <div class="quiz-mode-card-container">
+                <div onclick="selectQuizMode('quiz')" class="quiz-mode-card mode-chinese">
+                    <div class="quiz-mode-card-icon">📚</div>
+                    <div>
+                        <div class="quiz-mode-card-title">選中文</div>
+                        <div class="quiz-mode-card-desc">給予英文單字，選出正確的中文解釋。</div>
+                    </div>
+                </div>
+                <div onclick="selectQuizMode('reverse')" class="quiz-mode-card mode-english">
+                    <div class="quiz-mode-card-icon">🔍</div>
+                    <div>
+                        <div class="quiz-mode-card-title">選英文</div>
+                        <div class="quiz-mode-card-desc">給予中文定義，選出正確的英文單字。</div>
+                    </div>
+                </div>
+                <div onclick="selectQuizMode('spelling')" class="quiz-mode-card mode-spelling">
+                    <div class="quiz-mode-card-icon">✍️</div>
+                    <div>
+                        <div class="quiz-mode-card-title">拼字測驗</div>
+                        <div class="quiz-mode-card-desc">播放英文發音並提供中文提示，拼寫單字。</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" id="quiz-container" style="display: none;">
             <h2 id="unit-title">正在載入試題...</h2>
             <div id="progress" style="margin-bottom: 10px;"></div>
 
@@ -72,29 +103,47 @@
         let currentIndex = 0;
         let score = 0;
         let wrongWords = [];
+        let activeMode = "{{ mode }}"; // 'quiz', 'reverse', 'spelling' or 'None'
 
         async function init() {
+            if (activeMode && activeMode !== "None" && activeMode !== "unified" && activeMode !== "") {
+                document.getElementById('mode-select-container').style.display = 'none';
+                document.getElementById('quiz-container').style.display = 'block';
+                startQuiz();
+            } else {
+                document.getElementById('quiz-container').style.display = 'none';
+                document.getElementById('mode-select-container').style.display = 'block';
+                document.getElementById('mode-select-unit-name').innerText = unit;
+            }
+        }
+
+        function selectQuizMode(chosenMode) {
+            activeMode = chosenMode;
+            document.getElementById('mode-select-container').style.display = 'none';
+            document.getElementById('quiz-container').style.display = 'block';
+            startQuiz();
+        }
+
+        async function startQuiz() {
             const res = await fetch(`/api/words/${unit}`);
             words = await res.json();
             shuffle(words);
             renderQuestion();
         }
 
+        // Shuffle questions
         function shuffle(array) {
             array.sort(() => Math.random() - 0.5);
         }
-
-        const mode = "{{ mode }}"; // 'quiz', 'reverse', 'spelling'
-
-        // Define mode logic
-        const isSpelling = mode === 'spelling';
-        const isReverse = mode === 'reverse';
 
         function renderQuestion() {
             if (currentIndex >= words.length) return finishQuiz();
 
             const target = words[currentIndex];
-            document.getElementById('unit-title').innerText = `正在測試 (${modeText(mode)})：${unit}`;
+            const isSpelling = activeMode === 'spelling';
+            const isReverse = activeMode === 'reverse';
+
+            document.getElementById('unit-title').innerText = `正在測試 (${modeText(activeMode)})：${unit}`;
             document.getElementById('progress').innerText = `進度：${currentIndex + 1} / ${words.length}`;
 
             // 1. Setup Question Display
@@ -187,6 +236,7 @@
 
             input.disabled = true;
             const target = words[currentIndex];
+            const isSpelling = activeMode === 'spelling';
 
             if (userVal.toLowerCase() === target.word.toLowerCase()) {
                 score++;
@@ -211,6 +261,7 @@
         async function checkAnswer(selected, correct, btn) {
             const btns = document.querySelectorAll('.quiz-btn');
             btns.forEach(b => b.disabled = true);
+            const isReverse = activeMode === 'reverse';
 
             if (selected.word === correct.word) {
                 score++;
@@ -270,7 +321,7 @@
                         unit: unit,
                         score: score,
                         total: words.length,
-                        mode: modeText(mode),
+                        mode: modeText(activeMode),
                         user_name: currentUser, // Pass user name to backend
                         wrong_words_list: wrongWords
                     })
