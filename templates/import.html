@@ -20,7 +20,7 @@
                 <button onclick="uploadFile()" id="uploadBtn" class="btn btn-primary">上傳檔案</button>
             </section>
 
-            <section style="margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px;">
+            <section style="margin-top: 40px; border-top: 1px solid var(--border-color); padding-top: 20px;">
                 <h3>Step 2: 從雲端同步到資料庫</h3>
                 <p>上傳多個檔案後，點擊下方按鈕開始解析內容。</p>
                 <button onclick="reimport()" id="importBtn" class="btn">同步資料庫</button>
@@ -28,13 +28,13 @@
 
             <div id="status" style="margin-top: 20px; font-weight: bold; white-space: pre-line;"></div>
 
-            <section style="margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px;">
+            <section style="margin-top: 40px; border-top: 1px solid var(--border-color); padding-top: 20px;">
                 <h3>☁️ 雲端 PDF 檔案</h3>
                 <p style="color:var(--text-muted); font-size:0.85rem;">這些是 Supabase Storage 中的 PDF，同步時會從這裡讀取。</p>
                 <div id="storageList" style="margin-top: 10px;">載入中...</div>
             </section>
 
-            <section style="margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px;">
+            <section style="margin-top: 40px; border-top: 1px solid var(--border-color); padding-top: 20px;">
                 <h3>📋 已匯入的單元</h3>
                 <div id="unitList" style="margin-top: 10px;">載入中...</div>
             </section>
