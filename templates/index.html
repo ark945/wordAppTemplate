@@ -67,6 +67,7 @@
                         </div>
                         <p style="color: var(--text-muted); font-size: 0.95rem; margin: 5px 0; font-weight: 500;">請選擇學習模式或進入測驗：</p>
                         <div class="unit-action-group">
+                            <button id="btn-go-list" class="btn-action-list">📋 單字表</button>
                             <button id="btn-go-study" class="btn-action-study">📖 單字卡</button>
                             <button id="btn-go-quiz" class="btn-action-quiz">✏️ 測驗模式</button>
                         </div>
@@ -168,6 +169,11 @@
             localStorage.setItem('lastUser', user);
         }
 
+        function goList(unit) {
+            const user = document.getElementById('currentUser').value;
+            window.location.href = `/list/${unit}?user=${encodeURIComponent(user)}`;
+        }
+
         function goStudy(unit) {
             const user = document.getElementById('currentUser').value;
             window.location.href = `/study/${unit}?user=${encodeURIComponent(user)}`;
@@ -194,6 +200,7 @@
             document.getElementById('selected-unit-count').innerText = '⏳ 載入中...';
             
             // Set buttons click handlers
+            document.getElementById('btn-go-list').onclick = () => goList(unit);
             document.getElementById('btn-go-study').onclick = () => goStudy(unit);
             document.getElementById('btn-go-quiz').onclick = () => goUnifiedQuiz(unit);
             

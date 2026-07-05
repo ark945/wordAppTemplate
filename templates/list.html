@@ -6,21 +6,38 @@
     <title>單字列表 - 英文單字小學堂</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
+        .back-link {
+            color: var(--primary-color);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 20px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        .back-link:hover {
+            color: var(--primary-hover);
+            transform: translateX(-4px);
+        }
         table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
         }
-
         th,
         td {
             text-align: left;
-            padding: 12px;
+            padding: 14px;
             border-bottom: 1px solid var(--border-color);
         }
-
+        th {
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
         tr:hover {
-            background-color: #f8fafc;
+            background-color: rgba(255, 255, 255, 0.04);
         }
     </style>
 </head>
@@ -28,7 +45,7 @@
 <body>
     <div class="container" style="max-width: 1000px;">
         <div class="card">
-            <a href="{{ url_for('index') }}">← 返回主頁</a>
+            <a href="{{ url_for('index') }}" class="back-link">← 返回主頁</a>
             <h1>📋 單字總覽：{{ unit }}</h1>
 
             <table>

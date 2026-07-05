@@ -623,6 +623,7 @@ input[type="text"]:focus {
     margin-top: 10px;
 }
 
+.btn-action-list,
 .btn-action-study {
     flex: 1;
     min-width: 140px;
@@ -641,6 +642,7 @@ input[type="text"]:focus {
     transition: all 0.2s ease;
 }
 
+.btn-action-list:hover,
 .btn-action-study:hover {
     border-color: rgba(255, 255, 255, 0.2);
     background-color: rgba(255, 255, 255, 0.08);
