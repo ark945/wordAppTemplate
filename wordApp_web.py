@@ -113,7 +113,7 @@ class DatabaseManager:
     def get_units(self):
         try:
             response = supabase.table("words").select("unit").execute()
-            units = sorted(list(set([row['unit'] for row in response.data])))
+            units = sorted(list(set([row['unit'] for row in response.data])), reverse=True)
             return units
         except Exception as e:
             print(f"Supabase Get Units Error: {e}")

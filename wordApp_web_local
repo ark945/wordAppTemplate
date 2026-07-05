@@ -99,7 +99,7 @@ class DatabaseManager:
 
     def get_units(self):
         conn = self.get_connection()
-        cursor = conn.execute("SELECT DISTINCT unit FROM words ORDER BY unit")
+        cursor = conn.execute("SELECT DISTINCT unit FROM words ORDER BY unit DESC")
         units = [row[0] for row in cursor.fetchall()]
         conn.close()
         return units

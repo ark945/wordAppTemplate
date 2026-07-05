@@ -197,7 +197,7 @@
                     if (!unitMap[w.unit]) unitMap[w.unit] = 0;
                     unitMap[w.unit]++;
                 });
-                const units = Object.keys(unitMap).sort();
+                const units = Object.keys(unitMap).sort().reverse();
                 if (units.length === 0) {
                     container.innerHTML = '<p style="color: var(--text-muted);">尚未匯入任何單元。</p>';
                     return;
