@@ -128,18 +128,68 @@
                     <div id="target-word" class="word-main" style="font-size: 2rem; margin-bottom: 20px;">請聽音拼寫...</div>
                     <div class="word-card" style="padding: 0;">
                         <button onclick="playAudio()" class="btn btn-primary" style="margin-bottom:15px;">🔊 播放發音</button>
-                        <div style="font-size: 1.5rem; margin-bottom: 20px; color: #666;">提示：${target.definition}</div>
+                        <div style="font-size: 1.5rem; margin-bottom: 20px; color: var(--text-muted, #94a3b8);">提示：${target.definition}</div>
+                        
+                        <!-- Visualizer for underscores and letters -->
+                        <div id="spelling-visualizer" style="display: flex; gap: 8px; justify-content: center; margin-bottom: 25px; min-height: 3.5rem; flex-wrap: wrap;"></div>
+                        
                         <input type="text" id="spellingInput" 
                             value="" 
-                            style="font-size: 2rem; padding: 10px; width: 80%; text-align: center; border: 2px solid #ccc; border-radius: 8px;" 
+                            maxlength="${target.word.length}"
+                            style="font-size: 2rem; padding: 10px; width: 80%; text-align: center; border: 2px solid #ccc; border-radius: 8px; color: var(--text-main, #f8fafc); background: rgba(255, 255, 255, 0.05);" 
                             placeholder="輸入英文單字" autocomplete="off" 
                             onkeypress="handleSpellingEnter(event)">
                         <button onclick="checkSpelling()" class="btn btn-success" style="margin-top: 10px; display: block; margin: 10px auto;">送出答案</button>
                     </div>
                 `;
 
+                const spellingInput = document.getElementById('spellingInput');
+                const targetWord = target.word;
+
+                const updateVisualizer = (val) => {
+                    const container = document.getElementById('spelling-visualizer');
+                    if (!container) return;
+                    container.innerHTML = '';
+                    
+                    for (let i = 0; i < targetWord.length; i++) {
+                        const span = document.createElement('span');
+                        span.className = 'letter-slot';
+                        span.style.display = 'inline-block';
+                        span.style.width = '24px';
+                        span.style.margin = '0 4px';
+                        span.style.textAlign = 'center';
+                        span.style.fontSize = '2rem';
+                        span.style.fontWeight = 'bold';
+                        span.style.fontFamily = 'monospace';
+                        
+                        const char = targetWord[i];
+                        
+                        if (char === ' ' || char === '-' || char === "'") {
+                            span.innerText = char;
+                            span.style.borderBottom = 'none';
+                            span.style.color = 'var(--text-main, #f8fafc)';
+                        } else {
+                            if (i < val.length) {
+                                span.innerText = val[i];
+                                span.style.borderBottom = '3px solid transparent';
+                                span.style.color = 'var(--text-main, #f8fafc)';
+                            } else {
+                                span.innerHTML = '&nbsp;';
+                                span.style.borderBottom = '3px solid var(--text-muted, #94a3b8)';
+                            }
+                        }
+                        container.appendChild(span);
+                    }
+                };
+
+                updateVisualizer('');
+
+                spellingInput.addEventListener('input', (e) => {
+                    updateVisualizer(e.target.value);
+                });
+
                 // Focus input
-                setTimeout(() => document.getElementById('spellingInput').focus(), 100);
+                setTimeout(() => spellingInput.focus(), 100);
                 playAudio(); // Auto play
             } else {
                 // Restore standard question box if coming from spelling mode or ensuring structure
@@ -211,11 +261,13 @@
                 score++;
                 input.style.borderColor = "green";
                 input.style.backgroundColor = "#dcfce7";
+                input.style.color = "#15803d";
                 document.getElementById('feedback').innerHTML = "<span style='color:green'>正確！ Excellent!</span>";
             } else {
                 wrongWords.push(target);
                 input.style.borderColor = "red";
                 input.style.backgroundColor = "#fee2e2";
+                input.style.color = "#b91c1c";
                 document.getElementById('feedback').innerHTML = `<span style='color:red'>答錯了，正確是：<strong>${target.word}</strong></span>`;
             }
 
