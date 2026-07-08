@@ -136,7 +136,7 @@
                         <input type="text" id="spellingInput" 
                             value="" 
                             maxlength="${target.word.length}"
-                            style="font-size: 2rem; padding: 10px; width: 80%; text-align: center; border: 2px solid #ccc; border-radius: 8px; color: var(--text-main, #f8fafc); background: rgba(255, 255, 255, 0.05);" 
+                            style="position: absolute; opacity: 0; pointer-events: none; z-index: -1;" 
                             placeholder="輸入英文單字" autocomplete="off" 
                             onkeypress="handleSpellingEnter(event)">
                         <button onclick="checkSpelling()" class="btn btn-success" style="margin-top: 10px; display: block; margin: 10px auto;">送出答案</button>
@@ -187,6 +187,15 @@
                 spellingInput.addEventListener('input', (e) => {
                     updateVisualizer(e.target.value);
                 });
+
+                // Focus input on card click
+                const wordCard = qBox.querySelector('.word-card');
+                if (wordCard) {
+                    wordCard.style.cursor = 'pointer';
+                    wordCard.addEventListener('click', () => {
+                        spellingInput.focus();
+                    });
+                }
 
                 // Focus input
                 setTimeout(() => spellingInput.focus(), 100);
@@ -256,19 +265,22 @@
             input.disabled = true;
             const target = words[currentIndex];
             const isSpelling = activeMode === 'spelling';
+            const slots = document.querySelectorAll('.letter-slot');
 
             if (userVal.toLowerCase() === target.word.toLowerCase()) {
                 score++;
-                input.style.borderColor = "green";
-                input.style.backgroundColor = "#dcfce7";
-                input.style.color = "#15803d";
-                document.getElementById('feedback').innerHTML = "<span style='color:green'>正確！ Excellent!</span>";
+                slots.forEach(slot => {
+                    slot.style.color = "#10b981";
+                    slot.style.textShadow = "0 0 10px rgba(16, 185, 129, 0.4)";
+                });
+                document.getElementById('feedback').innerHTML = "<span style='color:#10b981; font-size: 1.5rem;'>正確！ Excellent!</span>";
             } else {
                 wrongWords.push(target);
-                input.style.borderColor = "red";
-                input.style.backgroundColor = "#fee2e2";
-                input.style.color = "#b91c1c";
-                document.getElementById('feedback').innerHTML = `<span style='color:red'>答錯了，正確是：<strong>${target.word}</strong></span>`;
+                slots.forEach(slot => {
+                    slot.style.color = "#ef4444";
+                    slot.style.textShadow = "0 0 10px rgba(239, 68, 68, 0.4)";
+                });
+                document.getElementById('feedback').innerHTML = `<span style='color:#ef4444; font-size: 1.5rem;'>答錯了，正確是：<strong>${target.word}</strong></span>`;
             }
 
             setTimeout(() => {
