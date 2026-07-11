@@ -267,7 +267,10 @@
             const isSpelling = activeMode === 'spelling';
             const slots = document.querySelectorAll('.letter-slot');
 
-            if (userVal.toLowerCase() === target.word.toLowerCase()) {
+            const cleanUser = userVal.toLowerCase().replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"');
+            const cleanTarget = target.word.toLowerCase().replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"');
+
+            if (cleanUser === cleanTarget) {
                 score++;
                 slots.forEach(slot => {
                     slot.style.color = "#10b981";
