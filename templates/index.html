@@ -100,6 +100,22 @@
                     </div>
                 </div>
 
+                <!-- 進度統計列 -->
+                <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; font-size: 0.95rem;">
+                    <div style="background: rgba(255, 255, 255, 0.03); padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 8px;">
+                        <span class="unit-status-pill not-started" style="padding: 2px 8px; border-radius: 50px;">未開始</span>
+                        <span style="font-weight: bold; color: var(--text-muted);" id="stat-not-started">0</span> 個單元
+                    </div>
+                    <div style="background: rgba(255, 255, 255, 0.03); padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 8px;">
+                        <span class="unit-status-pill in-progress" style="padding: 2px 8px; border-radius: 50px;">進行中</span>
+                        <span style="font-weight: bold; color: #fbbf24;" id="stat-in-progress">0</span> 個單元
+                    </div>
+                    <div style="background: rgba(255, 255, 255, 0.03); padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 8px;">
+                        <span class="unit-status-pill completed" style="padding: 2px 8px; border-radius: 50px;">已完成</span>
+                        <span style="font-weight: bold; color: #34d399;" id="stat-completed">0</span> 個單元
+                    </div>
+                </div>
+
                 <div class="progress-legend" style="margin-bottom: 20px;">
                     <div class="legend-item"><span class="legend-box badge-quiz" style="border-radius: 4px; border: none; width: 14px; height: 14px;"></span>選中文</div>
                     <div class="legend-item"><span class="legend-box badge-reverse" style="border-radius: 4px; border: none; width: 14px; height: 14px;"></span>選英文</div>
@@ -236,8 +252,12 @@
                 }
             });
 
+            const container = document.querySelector('.container');
             if (tabId === 'progress-tab') {
+                if (container) container.classList.add('wide-mode');
                 loadProgressData();
+            } else {
+                if (container) container.classList.remove('wide-mode');
             }
         }
 
@@ -326,6 +346,16 @@
         }
 
         function renderMatrixProgress() {
+            const resetStats = () => {
+                const statNotStarted = document.getElementById('stat-not-started');
+                const statInProgress = document.getElementById('stat-in-progress');
+                const statCompleted = document.getElementById('stat-completed');
+                if (statNotStarted) statNotStarted.innerText = 0;
+                if (statInProgress) statInProgress.innerText = 0;
+                if (statCompleted) statCompleted.innerText = 0;
+            };
+            resetStats();
+
             if (!progressRawData) return;
 
             const selectedUser = document.getElementById('progressUserFilter').value;
@@ -458,6 +488,10 @@
             // 4. 繪製最底下的 Summary 橫列
             footerRow.innerHTML = '<td class="sticky-col-header" style="font-weight: 700; background-color: #f1f5f9; position: sticky; left:0; z-index: 10;">Summary</td>';
             
+            let countNotStarted = 0;
+            let countInProgress = 0;
+            let countCompleted = 0;
+
             units.forEach(unit => {
                 const tdSummary = document.createElement('td');
                 const daysCount = completedDaysMap[unit] || 0;
@@ -468,12 +502,15 @@
                 
                 let statusBadge = '';
                 if (isCompleted) {
-                    statusBadge = '<span class="unit-status-pill completed" style="padding: 2px 6px; font-size: 0.7rem; margin-top: 4px; display: inline-block;">🎉 達標</span>';
+                    statusBadge = '<span class="unit-status-pill completed" style="padding: 2px 6px; font-size: 0.7rem; margin-top: 4px; display: inline-block;">🎉 已完成</span>';
                     tdSummary.style.backgroundColor = 'rgba(34, 197, 94, 0.08)';
+                    countCompleted++;
                 } else if (daysCount > 0) {
                     statusBadge = '<span class="unit-status-pill in-progress" style="padding: 2px 6px; font-size: 0.7rem; margin-top: 4px; display: inline-block;">⏳ 進行中</span>';
+                    countInProgress++;
                 } else {
                     statusBadge = '<span class="unit-status-pill not-started" style="padding: 2px 6px; font-size: 0.7rem; margin-top: 4px; display: inline-block;">未開始</span>';
+                    countNotStarted++;
                 }
 
                 tdSummary.innerHTML = `
@@ -482,6 +519,14 @@
                 `;
                 footerRow.appendChild(tdSummary);
             });
+
+            // 更新統計看板
+            const statNotStartedEl = document.getElementById('stat-not-started');
+            const statInProgressEl = document.getElementById('stat-in-progress');
+            const statCompletedEl = document.getElementById('stat-completed');
+            if (statNotStartedEl) statNotStartedEl.innerText = countNotStarted;
+            if (statInProgressEl) statInProgressEl.innerText = countInProgress;
+            if (statCompletedEl) statCompletedEl.innerText = countCompleted;
         }
 
         loadUsers();

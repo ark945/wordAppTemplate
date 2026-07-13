@@ -32,6 +32,10 @@ body {
     margin: 0 auto;
 }
 
+.container.wide-mode {
+    max-width: 1425px; /* 1.5x width */
+}
+
 .card {
     background: var(--card-bg);
     backdrop-filter: blur(16px);
