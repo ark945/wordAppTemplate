@@ -439,6 +439,34 @@ input[type="text"]:focus {
     color: #cbd5e1;
 }
 
+/* 今日列高亮標示 */
+.today-row td {
+    background-color: rgba(59, 130, 246, 0.15) !important;
+    border-top: 2px solid #3b82f6 !important;
+    border-bottom: 2px solid #3b82f6 !important;
+}
+
+.today-row td.date-col {
+    background-color: #1e3a8a !important;
+    color: #60a5fa !important;
+    font-weight: 700;
+    box-shadow: 2px 0 6px rgba(59, 130, 246, 0.4);
+}
+
+.today-badge {
+    display: inline-block;
+    background-color: #2563eb;
+    color: #ffffff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-left: 6px;
+    vertical-align: middle;
+    box-shadow: 0 0 6px rgba(37, 99, 235, 0.6);
+}
+
+
 /* 矩陣格 */
 .matrix-cell {
     min-width: 130px;
