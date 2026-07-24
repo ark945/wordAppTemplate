@@ -29,6 +29,15 @@ def load_config():
     except:
         return {}
 
+def save_config(cfg):
+    try:
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(cfg, f, ensure_ascii=False, indent=4)
+        return True
+    except Exception as e:
+        print(f"Save local config error: {e}")
+        return False
+
 # 偵測是否在 Hugging Face Spaces 執行 (通常會有 SPACE_ID)
 IS_CLOUD = os.environ.get("SPACE_ID") is not None
 local_cfg = load_config()
@@ -191,21 +200,32 @@ class DatabaseManager:
     def get_config(self, key):
         try:
             res = supabase.table("system_config").select("value").eq("key", key).execute()
-            if res.data:
+            if res.data and len(res.data) > 0 and res.data[0].get("value") is not None:
                 return res.data[0]["value"]
-            return None
         except Exception as e:
-            print(f"Supabase Get Config Error: {e}")
-            return None
+            print(f"Supabase Get Config Error ({key}): {e}")
+
+        local_cfg = load_config()
+        return local_cfg.get(key, None)
 
     def set_config(self, key, value):
+        success = False
         try:
             data = {"key": key, "value": value}
             supabase.table("system_config").upsert(data, on_conflict="key").execute()
-            return True
+            success = True
         except Exception as e:
-            print(f"Supabase Set Config Error: {e}")
-            return False
+            print(f"Supabase Set Config Error ({key}): {e}")
+
+        try:
+            local_cfg = load_config()
+            local_cfg[key] = value
+            save_config(local_cfg)
+            success = True
+        except Exception as e:
+            print(f"Local Save Config Error ({key}): {e}")
+
+        return success
 
     def clear_quiz_results(self):
         try:
