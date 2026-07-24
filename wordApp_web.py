@@ -283,8 +283,7 @@ def api_admin_config():
             r_settings = {
                 "start_date": "2026-07-01",
                 "end_date": "2026-08-31",
-                "required_days": 2,
-                "selected_units": []
+                "required_days": 2
             }
         e_settings = db.get_config("email_settings") or {}
         clean_email_settings = {
@@ -624,6 +623,17 @@ def api_delete_unit(unit_name):
             supabase.storage.from_("pdfs").remove([pdf_name])
         except Exception as e:
             print(f"Storage delete note: {e}")
+
+        # Also remove unit_name from review_settings.selected_units if present
+        try:
+            r_settings = db.get_config("review_settings") or {}
+            sel_units = r_settings.get("selected_units", [])
+            if unit_name in sel_units:
+                r_settings["selected_units"] = [u for u in sel_units if u != unit_name]
+                db.set_config("review_settings", r_settings)
+        except Exception as e:
+            print(f"Config clean note: {e}")
+
         return jsonify({"success": True, "message": f"已刪除 {unit_name}"})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)})
@@ -855,15 +865,15 @@ def api_review_progress():
         config_start = r_settings.get("start_date", "2026-07-01")
         config_end = r_settings.get("end_date", "2026-08-31")
         required_days = r_settings.get("required_days", 2)
-        selected_units = r_settings.get("selected_units", [])
+        selected_units = r_settings.get("selected_units", None)
 
         start_date = f"{config_start}T00:00:00+08:00"
         end_date = f"{config_end}T23:59:59+08:00"
 
         records = db.get_review_progress_records(start_date, end_date)
         all_units = db.get_units()
-        
-        if selected_units:
+
+        if selected_units is not None:
             units = [u for u in all_units if u in selected_units]
         else:
             units = all_units

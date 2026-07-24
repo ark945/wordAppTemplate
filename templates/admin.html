@@ -303,7 +303,8 @@
                 document.getElementById('requiredDays').value = rSettings.required_days || 2;
                 document.getElementById('reviewEnable').checked = rSettings.enable_review !== false;
 
-                // 填入單元選單
+                // 填入單元選單 (若未設定 selected_units 則預設全選)
+                const hasConfiguredUnits = Array.isArray(rSettings.selected_units);
                 const selectedUnits = rSettings.selected_units || [];
                 const container = document.getElementById('unitCheckboxes');
                 container.innerHTML = '';
@@ -311,7 +312,7 @@
                     container.innerHTML = '<span style="color: var(--text-muted);">系統中尚無單元單字</span>';
                 } else {
                     availableUnits.forEach(unit => {
-                        const isChecked = selectedUnits.includes(unit);
+                        const isChecked = hasConfiguredUnits ? selectedUnits.includes(unit) : true;
                         const label = document.createElement('label');
                         label.className = 'unit-checkbox-label';
                         label.innerHTML = `
